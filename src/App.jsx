@@ -31,20 +31,17 @@ function App() {
           <BrowserRouter>
             <ScrollToTop />
             <Routes>
-              {/* Public Routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/complete-registration" element={<CompleteRegistration />} />
+              {/* Public Routes - All routes are public now in Mock Mode */}
+              {/* <Route path="/login" element={<Login />} /> */}
+              {/* <Route path="/register" element={<Register />} /> */}
+              {/* <Route path="/complete-registration" element={<CompleteRegistration />} /> */}
 
-              {/* Protected Routes */}
-              <Route element={<PrivateRoute />}>
-                <Route path="/" element={<MainLayout />}>
-                  <Route index element={<Navigate to="/vender" replace />} />
-                  <Route path="vender" element={<SalesPage />} />
-                  <Route path="caja" element={<CashPage />} />
-                  <Route path="pendientes" element={<PendingPage />} />
-                  <Route path="ajustes" element={<SettingsPage />} />
-                </Route>
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<Navigate to="/vender" replace />} />
+                <Route path="vender" element={<SalesPage />} />
+                <Route path="caja" element={<CashPage />} />
+                <Route path="pendientes" element={<PendingPage />} />
+                <Route path="ajustes" element={<SettingsPage />} />
               </Route>
             </Routes>
           </BrowserRouter>

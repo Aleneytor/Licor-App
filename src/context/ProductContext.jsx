@@ -1,7 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
-import { useRealtime } from '../hooks/useRealtime';
+// import { useRealtime } from '../hooks/useRealtime'; // REMOVED
+import {
+    fetchProducts, createProduct, updateProduct,
+    fetchInventory, upsertInventory,
+    fetchPrices, // upsertPrice removed from import if used locally or we implement helper
+    fetchSettings, fetchEmissions, fetchSales
+} from '../services/api';
 
 const ProductContext = createContext();
 
@@ -35,14 +40,14 @@ export const ProductProvider = ({ children }) => {
     const [conversions, setConversions] = useState({});
     const [inventory, setInventory] = useState({});
 
-    // --- SUPABASE FULL SYNC ---
+    // --- MOCK DATA SYNC ---
     useEffect(() => {
         if (!organizationId) return;
 
         const fetchInitialData = async () => {
             try {
                 // 1. Products (Fetch Name, Color, ID)
-                const { data: products } = await supabase.from('products').select('id, name, color').eq('organization_id', organizationId);
+                const { data: products } = await fetchProducts(organizationId);
 
                 const currentProductMap = {}; // Name -> ID
                 const currentIdMap = {};      // ID -> Name
@@ -59,11 +64,8 @@ export const ProductProvider = ({ children }) => {
                     setProductMap(currentProductMap);
                 }
 
-                // 2. NUEVO: Cargar Emisiones desde la tabla SQL dedicada
-                const { data: emissionsData } = await supabase
-                    .from('emission_types')
-                    .select('*')
-                    .order('units', { ascending: true }); 
+                // 2. NUEVO: Cargar Emisiones desde mock
+                const { data: emissionsData } = await fetchEmissions();
 
                 if (emissionsData) {
                     setRawEmissions(emissionsData);
@@ -75,18 +77,15 @@ export const ProductProvider = ({ children }) => {
                 }
 
                 // Cargar Subtipos
-                const { data: settings } = await supabase.from('app_settings').select('key, value').eq('organization_id', organizationId);
+                const { data: settings } = await fetchSettings(organizationId);
                 if (settings) {
-                    settings.forEach(s => {
-                        if (s.key === 'subtypes') setSubtypes(s.value);
-                    });
-                    if (!settings.find(s => s.key === 'subtypes')) {
-                        setSubtypes(['Botella', 'Botella Tercio', 'Lata Pequeña', 'Lata Grande']);
-                    }
+                    const subtypesSetting = settings.find(s => s.key === 'subtypes');
+                    if (subtypesSetting) setSubtypes(subtypesSetting.value);
+                    else setSubtypes(['Botella', 'Botella Tercio', 'Lata Pequeña', 'Lata Grande']);
                 }
 
                 // 3. Inventory (Uses product_id)
-                const { data: inv } = await supabase.from('inventory').select('product_id, subtype, quantity').eq('organization_id', organizationId);
+                const { data: inv } = await fetchInventory(organizationId);
                 if (inv) {
                     const invMap = {};
                     inv.forEach(item => {
@@ -99,7 +98,7 @@ export const ProductProvider = ({ children }) => {
                 }
 
                 // 4. Prices
-                const { data: pr } = await supabase.from('prices').select('*').eq('organization_id', organizationId);
+                const { data: pr } = await fetchPrices(organizationId);
                 if (pr) {
                     const priceMap = {};
                     pr.forEach(p => {
@@ -113,10 +112,11 @@ export const ProductProvider = ({ children }) => {
                 }
 
                 // 5. Conversions
-                const { data: conv } = await supabase.from('conversions').select('*').eq('organization_id', organizationId);
-                if (conv) {
+                // Mock conversions from local storage for now if not in API
+                const storedConversions = loadFromStorage('mock_conversions', []);
+                if (storedConversions) {
                     const convMap = {};
-                    conv.forEach(c => {
+                    storedConversions.forEach(c => {
                         convMap[`${c.emission}_${c.subtype}`] = c.units;
                     });
                     setConversions(convMap);
@@ -131,29 +131,13 @@ export const ProductProvider = ({ children }) => {
     }, [organizationId]);
 
     // --- REALTIME ALIGNMENT ---
-    useRealtime(organizationId, 'inventory', (payload) => {
-        const { new: newItem, eventType } = payload;
-        if (eventType === 'DELETE') return;
-
-        const productName = Object.keys(productMap).find(key => productMap[key] === newItem.product_id);
-
-        if (productName && newItem.subtype) {
-            setInventory(prev => ({
-                ...prev,
-                [`${productName}_${newItem.subtype}`]: newItem.quantity
-            }));
-        }
-    });
+    // Removed because Mock Data is local only. Refreshes will reload data.
 
     // --- PRODUCT MANAGEMENT ---
     const addBeerType = async (name, color) => {
         if (!organizationId) throw new Error("No estás conectado a una organización.");
         if (!beerTypes.includes(name)) {
-            const { data, error } = await supabase
-                .from('products')
-                .insert([{ name, color, organization_id: organizationId }])
-                .select()
-                .single();
+            const { data, error } = await createProduct({ name, color, organization_id: organizationId });
 
             if (error) throw error;
             if (data) {
@@ -168,15 +152,16 @@ export const ProductProvider = ({ children }) => {
         setBeerColors(prev => ({ ...prev, [name]: color }));
         const productId = productMap[name];
         if (productId) {
-            await supabase.from('products').update({ color }).eq('id', productId);
+            await updateProduct(productId, { color });
         }
     };
 
     const removeBeerType = async (name) => {
+        // Not fully implemented in Mock API yet but UI expects it
         const productId = productMap[name];
         if (!productId) return;
         setBeerTypes(prev => prev.filter(b => b !== name));
-        await supabase.from('products').delete().eq('id', productId);
+        // await deleteProduct(productId); // Mock delete not impl
     };
 
     const getBeerColor = (beerName) => {
@@ -194,14 +179,12 @@ export const ProductProvider = ({ children }) => {
     const addEmissionType = async (name, units = 1) => {
         if (!emissionOptions.includes(name)) {
             try {
-                const { data, error } = await supabase
-                    .from('emission_types')
-                    .insert([{ name, units: parseInt(units) }])
-                    .select();
-
-                if (error) throw error;
-                setRawEmissions(prev => [...prev, ...data]);
+                // Mock insert
+                const newEmission = { id: Date.now(), name, units: parseInt(units) };
+                const updated = [...rawEmissions, newEmission];
+                setRawEmissions(updated);
                 setEmissionOptions(prev => [...prev, name]);
+                localStorage.setItem('mock_emissions', JSON.stringify(updated));
                 return { success: true };
             } catch (error) {
                 console.error("Error creating emission:", error);
@@ -217,14 +200,10 @@ export const ProductProvider = ({ children }) => {
             return;
         }
         try {
-            const { error } = await supabase
-                .from('emission_types')
-                .delete()
-                .eq('name', name);
-
-            if (error) throw error;
+            const updated = rawEmissions.filter(e => e.name !== name);
+            setRawEmissions(updated);
             setEmissionOptions(prev => prev.filter(e => e !== name));
-            setRawEmissions(prev => prev.filter(e => e.name !== name));
+            localStorage.setItem('mock_emissions', JSON.stringify(updated));
         } catch (error) {
             console.error("Error removing emission:", error);
         }
@@ -239,14 +218,30 @@ export const ProductProvider = ({ children }) => {
 
         const productId = productMap[beer];
         if (productId) {
-            await supabase.from('prices').upsert({
+            // Mock Upsert Price
+            const prices = loadFromStorage('mock_prices', []);
+            const existingIndex = prices.findIndex(p =>
+                p.product_id === productId &&
+                p.emission === emission &&
+                p.subtype === subtype &&
+                p.is_local === isLocal
+            );
+
+            const priceData = {
                 organization_id: organizationId,
                 product_id: productId,
                 emission,
                 subtype,
                 price: newPrice,
                 is_local: isLocal
-            }, { onConflict: 'organization_id, product_id, emission, subtype, is_local' });
+            };
+
+            if (existingIndex >= 0) {
+                prices[existingIndex] = { ...prices[existingIndex], ...priceData };
+            } else {
+                prices.push({ ...priceData, id: Date.now().toString() });
+            }
+            localStorage.setItem('mock_prices', JSON.stringify(prices));
         }
     };
 
@@ -260,12 +255,20 @@ export const ProductProvider = ({ children }) => {
         const key = `${emission}_${subtype}`;
         const newUnits = parseInt(units, 10);
         setConversions(prev => ({ ...prev, [key]: newUnits }));
-        await supabase.from('conversions').upsert({
-            organization_id: organizationId,
-            emission,
-            subtype,
-            units: newUnits
-        }, { onConflict: 'organization_id, emission, subtype' });
+
+        // Mock Upsert Conversion
+        const conversions = loadFromStorage('mock_conversions', []);
+        const existingIndex = conversions.findIndex(c =>
+            c.emission === emission && c.subtype === subtype
+        );
+        const data = { organization_id: organizationId, emission, subtype, units: newUnits };
+
+        if (existingIndex >= 0) {
+            conversions[existingIndex] = { ...conversions[existingIndex], ...data };
+        } else {
+            conversions.push({ ...data, id: Date.now().toString() });
+        }
+        localStorage.setItem('mock_conversions', JSON.stringify(conversions));
     };
 
     const getUnitsPerEmission = (emission, subtype) => {
@@ -313,38 +316,33 @@ export const ProductProvider = ({ children }) => {
     };
 
     // --- INVENTORY MANAGEMENT (CORREGIDO) ---
-    
+
     const addStock = async (beer, emission, subtype, quantity) => {
         const units = quantity * getUnitsPerEmission(emission, subtype);
         const key = `${beer}_${subtype}`;
-        
-        // CORRECCIÓN: Calcular el nuevo total usando el estado actual DIRECTAMENTE
-        // No confiamos en el callback de setInventory para obtener el valor para la DB
+
         const currentTotal = inventory[key] || 0;
         const newTotal = currentTotal + units;
 
         // 1. Actualizar UI
         setInventory(prev => ({ ...prev, [key]: newTotal }));
 
-        // 2. Actualizar Base de Datos con el valor calculado explícitamente
+        // 2. Actualizar Mock BD
         const productId = productMap[beer];
         if (productId) {
-            const { error } = await supabase.from('inventory').upsert({
+            await upsertInventory({
                 organization_id: organizationId,
                 product_id: productId,
                 subtype,
-                quantity: newTotal 
-            }, { onConflict: 'organization_id, product_id, subtype' });
-            
-            if (error) console.error("Error guardando stock en BD:", error.message);
+                quantity: newTotal
+            });
         }
     };
 
     const deductStock = async (beer, emission, subtype, quantity) => {
         const units = quantity * getUnitsPerEmission(emission, subtype);
         const key = `${beer}_${subtype}`;
-        
-        // CORRECCIÓN: Misma lógica para deduct
+
         const currentTotal = inventory[key] || 0;
         const newTotal = Math.max(0, currentTotal - units);
 
@@ -352,31 +350,28 @@ export const ProductProvider = ({ children }) => {
 
         const productId = productMap[beer];
         if (productId) {
-            const { error } = await supabase.from('inventory').upsert({
+            await upsertInventory({
                 organization_id: organizationId,
                 product_id: productId,
                 subtype,
                 quantity: newTotal
-            }, { onConflict: 'organization_id, product_id, subtype' });
-
-            if (error) console.error("Error guardando stock en BD:", error.message);
+            });
         }
     };
 
     const setBaseStock = async (beer, subtype, units) => {
         const key = `${beer}_${subtype}`;
-        
-        // CORRECCIÓN: Simple asignación directa
+
         setInventory(prev => ({ ...prev, [key]: units }));
-        
+
         const productId = productMap[beer];
         if (productId) {
-            await supabase.from('inventory').upsert({
+            await upsertInventory({
                 organization_id: organizationId,
                 product_id: productId,
                 subtype,
                 quantity: units
-            }, { onConflict: 'organization_id, product_id, subtype' });
+            });
         }
     };
 
@@ -489,3 +484,4 @@ export const ProductProvider = ({ children }) => {
         </ProductContext.Provider>
     );
 };
+

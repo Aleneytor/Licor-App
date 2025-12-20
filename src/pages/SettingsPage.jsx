@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useProduct } from '../context/ProductContext';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../supabaseClient';
+// import { supabase } from '../supabaseClient';
 import { Trash2, Plus, Save, ChevronRight, ChevronLeft, CircleDollarSign, Users, Package, Star, Box, Send, LogOut } from 'lucide-react';
 import AccordionSection from '../components/AccordionSection';
 import StockManager from '../components/StockManager';
@@ -93,7 +93,7 @@ export default function SettingsPage() {
         beerTypes, addBeerType, removeBeerType,
         emissionOptions, addEmissionType, removeEmissionType,
         prices, updatePrice, getPrice,
-        inventory, 
+        inventory,
         exchangeRates = {}, fetchRates,
         conversions, updateConversion, subtypes, getUnitsPerEmission,
         getBeerColor, updateBeerColor
@@ -111,15 +111,15 @@ export default function SettingsPage() {
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState('EMPLOYEE');
     const [inviteStatus, setInviteStatus] = useState('');
-    const [currentView, setCurrentView] = useState('main'); 
+    const [currentView, setCurrentView] = useState('main');
     const [openSettingSection, setOpenSettingSection] = useState('beers');
-    const [showColorPicker, setShowColorPicker] = useState(false); 
+    const [showColorPicker, setShowColorPicker] = useState(false);
     const [pickerPos, setPickerPos] = useState({ top: 0, left: 0 });
 
     // Form inputs state
     const [newBeerName, setNewBeerName] = useState('');
     const [newBeerColor, setNewBeerColor] = useState('#3b82f6');
-    
+
     // --- NUEVO: Estado para Nombre y Unidades de la Emisión ---
     const [newEmissionName, setNewEmissionName] = useState('');
     const [newEmissionUnits, setNewEmissionUnits] = useState(''); // <--- NUEVO
@@ -132,7 +132,7 @@ export default function SettingsPage() {
     const [localPriceInput, setLocalPriceInput] = useState('');
 
     const presetColors = [
-        '#FF8080', '#FFBF80', '#FFFF80', '#80FF80', '#80FFBF', '#80FFFF', 
+        '#FF8080', '#FFBF80', '#FFFF80', '#80FF80', '#80FFBF', '#80FFFF',
         '#80BFFF', '#BF80FF', '#FF80FF', '#C0C0C0', '#606060', '#000000'
     ];
 
@@ -181,7 +181,7 @@ export default function SettingsPage() {
             }
 
             const result = await addEmissionType(newEmissionName.trim(), units);
-            
+
             if (result.success) {
                 setNewEmissionName('');
                 setNewEmissionUnits(''); // Limpiar campo
@@ -211,27 +211,13 @@ export default function SettingsPage() {
     const handleInvite = async (e) => {
         e.preventDefault();
         setInviteStatus('loading');
-        try {
-            const { error: dbError } = await supabase
-                .from('organization_invites')
-                .insert([{ email: inviteEmail, organization_id: organizationId, role: inviteRole }]);
-            if (dbError) throw dbError;
-
-            const { error: authError } = await supabase.auth.signInWithOtp({
-                email: inviteEmail,
-                options: { emailRedirectTo: `${window.location.origin}/complete-registration` }
-            });
-            if (authError) throw authError;
-
+        // Mock Invitation
+        setTimeout(() => {
             setInviteStatus('success');
             setInviteEmail('');
             setInviteRole('EMPLOYEE');
-            alert('Invitación enviada.');
-        } catch (err) {
-            console.error(err);
-            setInviteStatus('error');
-            alert('Error al invitar: ' + err.message);
-        }
+            alert('Invitación simulada enviada (Modo Local).');
+        }, 1000);
     };
 
     const MainMenu = () => (
@@ -330,9 +316,9 @@ export default function SettingsPage() {
 
             {currentView === 'users' && (
                 <div className="order-summary-card">
-                   {/* ... (Sección de usuarios sin cambios) ... */}
-                   {/* Mantuve el código de usuarios original pero lo he resumido aquí para que quepa */}
-                   <div style={{ padding: '1.5rem', textAlign: 'center' }}>
+                    {/* ... (Sección de usuarios sin cambios) ... */}
+                    {/* Mantuve el código de usuarios original pero lo he resumido aquí para que quepa */}
+                    <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                         <div style={{ marginBottom: '2rem' }}>
                             <div style={{ width: '64px', height: '64px', background: '#f3f4f6', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
                                 <Users size={32} color="#333" />
@@ -410,20 +396,20 @@ export default function SettingsPage() {
 
                         {/* INPUTS NUEVOS: Nombre + Unidades */}
                         <div className="input-group-large" style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-                            <input 
-                                type="text" 
-                                placeholder="Nombre (ej: Pack)" 
-                                className="ticket-input-large" 
-                                value={newEmissionName} 
-                                onChange={(e) => setNewEmissionName(e.target.value)} 
+                            <input
+                                type="text"
+                                placeholder="Nombre (ej: Pack)"
+                                className="ticket-input-large"
+                                value={newEmissionName}
+                                onChange={(e) => setNewEmissionName(e.target.value)}
                                 style={{ flex: 2 }}
                             />
-                            <input 
-                                type="number" 
-                                placeholder="Uds" 
-                                className="ticket-input-large" 
-                                value={newEmissionUnits} 
-                                onChange={(e) => setNewEmissionUnits(e.target.value)} 
+                            <input
+                                type="number"
+                                placeholder="Uds"
+                                className="ticket-input-large"
+                                value={newEmissionUnits}
+                                onChange={(e) => setNewEmissionUnits(e.target.value)}
                                 style={{ flex: 1, minWidth: '60px' }}
                             />
                             <button onClick={handleAddEmission} className="option-btn selected" style={{ padding: '1rem', height: 'auto', borderRadius: '50%' }}>
@@ -453,7 +439,7 @@ export default function SettingsPage() {
                                                 <Trash2 size={20} />
                                             </button>
                                         ) : (
-                                            <div style={{ width: 20, height: 20 }} /> 
+                                            <div style={{ width: 20, height: 20 }} />
                                         )}
                                     </div>
                                 );

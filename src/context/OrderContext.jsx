@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
+// import { supabase } from '../supabaseClient'; 
 import { useAuth } from './AuthContext';
 import { useProduct } from './ProductContext';
 import { createSales } from '../services/api';
