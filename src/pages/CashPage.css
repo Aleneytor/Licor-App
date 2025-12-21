@@ -183,8 +183,36 @@ h2.card-title {
     color: var(--text-primary);
 }
 
+
 .stat-label {
     font-size: 0.9rem;
     color: var(--text-secondary);
     font-weight: 500;
+}
+
+/* Action Button */
+.action-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--accent-light);
+    color: var(--text-primary);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 600;
+}
+
+.action-btn:hover {
+    background: var(--bg-card-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark Mode explicit fix */
+.dark .action-btn {
+    background: var(--bg-card-hover);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .action-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
 }
