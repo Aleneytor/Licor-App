@@ -14,6 +14,8 @@ import { ProductProvider } from './context/ProductContext';
 import { OrderProvider } from './context/OrderContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { NotificationProvider } from './context/NotificationContext';
+import NotificationToast from './components/NotificationToast';
 
 // Private Route Wrapper
 const PrivateRoute = () => {
@@ -27,29 +29,32 @@ const PrivateRoute = () => {
 function App() {
   return (
     <AuthProvider>
-      <ThemeProvider>
-        <ProductProvider>
-          <OrderProvider>
-            <BrowserRouter>
-              <ScrollToTop />
-              <Routes>
-                {/* Public Routes - All routes are public now in Mock Mode */}
-                {/* <Route path="/login" element={<Login />} /> */}
-                {/* <Route path="/register" element={<Register />} /> */}
-                {/* <Route path="/complete-registration" element={<CompleteRegistration />} /> */}
+      <NotificationProvider>
+        <ThemeProvider>
+          <ProductProvider>
+            <OrderProvider>
+              <BrowserRouter>
+                <ScrollToTop />
+                <NotificationToast />
+                <Routes>
+                  {/* Public Routes - All routes are public now in Mock Mode */}
+                  {/* <Route path="/login" element={<Login />} /> */}
+                  {/* <Route path="/register" element={<Register />} /> */}
+                  {/* <Route path="/complete-registration" element={<CompleteRegistration />} /> */}
 
-                <Route path="/" element={<MainLayout />}>
-                  <Route index element={<Navigate to="/vender" replace />} />
-                  <Route path="vender" element={<SalesPage />} />
-                  <Route path="caja" element={<CashPage />} />
-                  <Route path="pendientes" element={<PendingPage />} />
-                  <Route path="ajustes" element={<SettingsPage />} />
-                </Route>
-              </Routes>
-            </BrowserRouter>
-          </OrderProvider>
-        </ProductProvider>
-      </ThemeProvider>
+                  <Route path="/" element={<MainLayout />}>
+                    <Route index element={<Navigate to="/vender" replace />} />
+                    <Route path="vender" element={<SalesPage />} />
+                    <Route path="caja" element={<CashPage />} />
+                    <Route path="pendientes" element={<PendingPage />} />
+                    <Route path="ajustes" element={<SettingsPage />} />
+                  </Route>
+                </Routes>
+              </BrowserRouter>
+            </OrderProvider>
+          </ProductProvider>
+        </ThemeProvider>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { useOrder } from '../context/OrderContext';
 import { useProduct } from '../context/ProductContext';
+import { useNotification } from '../context/NotificationContext';
 import { Clock, Plus, Beer, MoreVertical, X, CheckCircle, ChevronDown, ChevronUp, Search, History, Store, User, Hash, AlertCircle } from 'lucide-react';
 import TicketGrid from '../components/TicketGrid';
 import ContainerSelector from '../components/ContainerSelector';
 import './PendingPage.css'; // We will create this
 
 export default function PendingPage() {
-    const { pendingOrders, addItemToOrder, closeOrder, createOrder } = useOrder();
-    const { getBsPrice, beerTypes, exchangeRates, getPrice } = useProduct();
+    const { pendingOrders, addItemToOrder, closeOrder, createOrder, calculateOrderTotal } = useOrder();
+    const { getBsPrice, beerTypes, exchangeRates, getPrice, currencySymbol } = useProduct();
     const [selectedOrder, setSelectedOrder] = useState(null); // For "Add Item" modal
     const [closingOrderId, setClosingOrderId] = useState(null); // For "Confirm Close" modal
     const [newTabName, setNewTabName] = useState('');
@@ -19,10 +20,24 @@ export default function PendingPage() {
     const [paymentReference, setPaymentReference] = useState('');
     const paymentMethods = ['Efectivo', 'Pago Movil', 'Punto', 'BioPago'];
 
+    const { showNotification } = useNotification(); // Already imported line 535, need to move it up or use existing
+    // Check line 535 in view_file. No, wait. 
+    // The previous view_file says `const { showNotification } = useNotification();` IS THERE but it seems to be in `PendingPage` which is correct, but let's check its scope. 
+    // Wait, the previous view_file was SettingsPage.jsx (Step 406). 
+    // PendingPage content (Step 419) doesn't show useNotification usage.
+    // I need to add `const { showNotification } = useNotification();` to PendingPage component.
+
+    // Step 419 shows line 12: `const [selectedOrder...]`
+    // I need to update line 11-12.
+
     const handleQuickOpenTab = () => {
-        if (!newTabName.trim()) return;
+        if (!newTabName.trim()) {
+            showNotification('Por favor, ingresa un nombre para la carta (ej: Mesa 5)', 'error');
+            return;
+        }
         createOrder(newTabName.trim(), [], 'Local');
         setNewTabName('');
+        showNotification('Carta abierta exitosamente', 'success');
     };
 
     // Collapsible State (Store expanded IDs)
@@ -77,17 +92,10 @@ export default function PendingPage() {
         }
     });
 
-    const getOrderTotal = (items) => {
-        return items.reduce((acc, item) => {
-            if (item.emission === 'Libre' || item.emission === 'Consumo') {
-                const slotsPrice = (item.slots || []).reduce((sum, beer) => {
-                    return sum + getPrice(beer, 'Unidad', item.subtype, 'local');
-                }, 0);
-                return acc + slotsPrice;
-            }
-            const p = item.price || getPrice(item.beerType || item.name, item.emission, item.subtype, 'local');
-            return acc + (p * item.quantity);
-        }, 0);
+    const getOrderTotal = (items, type) => {
+        // Use the centralized logic from OrderContext (returns { totalBs, totalUsd })
+        const { totalUsd } = calculateOrderTotal(items, type);
+        return totalUsd;
     }
 
     // LIST RENDERER
@@ -178,7 +186,30 @@ export default function PendingPage() {
                             <div className="order-footer">
                                 <div className="total-row">
                                     <span className="label">Total Estimado</span>
-                                    <span className="amount">${getOrderTotal(order.items).toFixed(2)}</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        {(() => {
+                                            const { totalUsd, details } = calculateOrderTotal(order.items, order.type);
+                                            return (
+                                                <>
+                                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                                        {(details || []).map((d, i) => (
+                                                            <span key={i} style={{
+                                                                background: 'rgba(52, 199, 89, 0.15)',
+                                                                color: '#34c759',
+                                                                fontSize: '0.7rem',
+                                                                padding: '2px 6px',
+                                                                borderRadius: '6px',
+                                                                fontWeight: 600
+                                                            }}>
+                                                                {d}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                    <span className="amount">{currencySymbol}{totalUsd.toFixed(2)}</span>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
                                 </div>
                                 <div className="actions-row" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.75rem' }}>
                                     <button className="action-btn close-ticket-btn" onClick={() => setClosingOrderId(order.id)} style={{ flex: 1 }}>
@@ -251,7 +282,7 @@ export default function PendingPage() {
                         <Plus size={20} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--accent-color)' }} />
                         <input
                             type="text"
-                            placeholder="Nombre para nueva carta (ej: Mesa 5)"
+                            placeholder="Nombre del cliente o Ref (ej: Juan - Barra)"
                             value={newTabName}
                             onChange={(e) => setNewTabName(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleQuickOpenTab()}
@@ -269,12 +300,12 @@ export default function PendingPage() {
                     </div>
                     <button
                         onClick={handleQuickOpenTab}
-                        disabled={!newTabName.trim()}
+                        // disabled={!newTabName.trim()} Remove disabled prop so we can show error
                         style={{
                             padding: '0 1.5rem',
                             borderRadius: '12px',
-                            background: newTabName.trim() ? 'var(--accent-color)' : 'var(--bg-card-hover)',
-                            color: 'white',
+                            background: newTabName.trim() ? '#F97316' : 'var(--bg-card-hover)',
+                            color: newTabName.trim() ? '#ffffff' : 'var(--text-secondary)',
                             border: 'none',
                             fontWeight: 700,
                             cursor: 'pointer',
@@ -401,7 +432,7 @@ export default function PendingPage() {
                                         <Beer size={18} />
                                         <span style={{ textAlign: 'center' }}>{beer}</span>
                                         <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>
-                                            ${getPrice(beer, 'Unidad', quickAddSubtype, 'local').toFixed(2)}
+                                            {currencySymbol}{getPrice(beer, 'Unidad', quickAddSubtype, 'local').toFixed(2)}
                                         </span>
                                     </button>
                                 ))
@@ -496,7 +527,7 @@ export default function PendingPage() {
             {closingOrderId && (() => {
                 const orderToClose = pendingOrders.find(o => o.id === closingOrderId);
                 if (!orderToClose) return null;
-                const totalUsd = getOrderTotal(orderToClose.items);
+                const totalUsd = getOrderTotal(orderToClose.items, orderToClose.type);
                 const totalBs = totalUsd * (exchangeRates.bcv || 0);
                 const isOpenTab = orderToClose.items.some(i => i.emission === 'Libre' || i.emission === 'Consumo');
 

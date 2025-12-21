@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useProduct } from '../context/ProductContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useNotification } from '../context/NotificationContext';
 // import { supabase } from '../supabaseClient';
-import { Trash2, Plus, Save, ChevronRight, ChevronLeft, CircleDollarSign, Users, Package, Star, Box, Send, LogOut, Moon, Sun, Store, ShoppingBag, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, Plus, Save, ChevronRight, ChevronLeft, CircleDollarSign, Users, Package, Star, Box, Send, LogOut, Moon, Sun, Store, ShoppingBag, Search, ChevronDown, ChevronUp, X } from 'lucide-react';
 import AccordionSection from '../components/AccordionSection';
 import StockManager from '../components/StockManager';
 import ContainerSelector from '../components/ContainerSelector';
@@ -271,8 +272,22 @@ const BeerPriceEditor = ({ beerName }) => {
     const {
         getEmissionsForSubtype,
         getPrice,
-        updatePrice
+        updatePrice, currencySymbol
     } = useProduct();
+    const { showNotification } = useNotification();
+
+    // Local Popup State
+    const [successPopup, setSuccessPopup] = useState(null); // { message: string }
+
+    // Auto-close popup
+    useEffect(() => {
+        if (successPopup) {
+            const timer = setTimeout(() => {
+                setSuccessPopup(null);
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [successPopup]);
 
     const [subtype, setSubtype] = useState('Botella');
     // Memoize calculating emissions to prevent infinite render loop
@@ -309,20 +324,32 @@ const BeerPriceEditor = ({ beerName }) => {
     };
 
     const handleSaveAll = () => {
-        let count = 0;
+        const changes = [];
         Object.entries(priceMap).forEach(([emission, values]) => {
             // Update Standard
             if (values.standard !== '') {
-                updatePrice(beerName, emission, subtype, values.standard, false);
-                count++;
+                const oldPrice = getPrice(beerName, emission, subtype, 'standard');
+                const newPrice = parseFloat(values.standard);
+                if (oldPrice !== newPrice) {
+                    changes.push({ emission, type: 'Llevar', old: oldPrice, new: newPrice });
+                    updatePrice(beerName, emission, subtype, values.standard, false);
+                }
             }
             // Update Local
             if (values.local !== '') {
-                updatePrice(beerName, emission, subtype, values.local, true);
-                count++;
+                const oldPrice = getPrice(beerName, emission, subtype, 'local');
+                const newPrice = parseFloat(values.local);
+                if (oldPrice !== newPrice) {
+                    changes.push({ emission, type: 'Local', old: oldPrice, new: newPrice });
+                    updatePrice(beerName, emission, subtype, values.local, true);
+                }
             }
         });
-        alert(`Precios actualizados para ${beerName} (${subtype})`);
+
+        if (changes.length > 0) {
+            setSuccessPopup({ beerName, subtype, changes });
+            setTimeout(() => setSuccessPopup(null), 4000);
+        }
     };
 
     return (
@@ -361,7 +388,7 @@ const BeerPriceEditor = ({ beerName }) => {
                             <div style={{ background: 'var(--bg-card-hover)', padding: '0.75rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                                     <ShoppingBag size={14} color="var(--text-secondary)" />
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, opacity: 0.7 }}>PARA LLEVAR ($)</span>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, opacity: 0.7 }}>PARA LLEVAR ({currencySymbol})</span>
                                 </div>
                                 <input
                                     type="number"
@@ -380,7 +407,7 @@ const BeerPriceEditor = ({ beerName }) => {
                             <div style={{ background: 'var(--bg-card-hover)', padding: '0.75rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                                     <Store size={14} color="var(--text-secondary)" />
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, opacity: 0.7 }}>LOCAL ($)</span>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, opacity: 0.7 }}>LOCAL ({currencySymbol})</span>
                                 </div>
                                 <input
                                     type="number"
@@ -408,7 +435,101 @@ const BeerPriceEditor = ({ beerName }) => {
             </button>
             <style jsx>{`
                 .order-summary-card > div > div:last-child { border-bottom: none !important; padding-bottom: 0 !important; }
+                @keyframes fadeInPopup { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
             `}</style>
+
+            {/* LOCAL POPUP FOR PRICE UPDATES */}
+            {successPopup && (
+                <div
+                    onClick={() => setSuccessPopup(null)}
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 10000,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)'
+                    }}
+                >
+                    <div
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            backgroundColor: 'rgba(28, 28, 30, 0.95)',
+                            backdropFilter: 'blur(12px)',
+                            WebkitBackdropFilter: 'blur(12px)',
+                            color: 'white',
+                            padding: '24px 32px',
+                            borderRadius: '20px',
+                            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '12px',
+                            minWidth: '320px',
+                            maxWidth: '400px',
+                            textAlign: 'center',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            animation: 'fadeInPopup 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                            position: 'relative'
+                        }}>
+                        <button
+                            onClick={() => setSuccessPopup(null)}
+                            style={{
+                                position: 'absolute',
+                                top: '12px',
+                                right: '12px',
+                                background: 'none',
+                                border: 'none',
+                                color: '#ffffff',
+                                opacity: 0.5,
+                                cursor: 'pointer',
+                                padding: '4px'
+                            }}
+                        >
+                            <X size={18} />
+                        </button>
+                        <div>
+                            <div style={{
+                                width: '40px', height: '40px', borderRadius: '50%',
+                                background: 'rgba(74, 222, 128, 0.2)', color: '#4ade80',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                marginBottom: '4px'
+                            }}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                            </div>
+
+                            {typeof successPopup === 'string' ? (
+                                <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{successPopup}</span>
+                            ) : (
+                                <>
+                                    <h4 style={{ margin: 0, fontSize: '1rem', color: '#ccc' }}>
+                                        Actualizado {successPopup.beerName} ({successPopup.subtype})
+                                    </h4>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                                        {successPopup.changes.map((change, idx) => (
+                                            <div key={idx} style={{
+                                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                background: 'rgba(255,255,255,0.05)', padding: '8px 12px', borderRadius: '8px',
+                                                fontSize: '0.9rem'
+                                            }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                    <span style={{ fontWeight: 600 }}>{change.emission}</span>
+                                                    <span style={{ fontSize: '0.75rem', color: '#999' }}>{change.type}</span>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{ color: '#aaa', textDecoration: 'line-through' }}>{currencySymbol}{change.old}</span>
+                                                    <span style={{ color: '#aaa' }}>→</span>
+                                                    <span style={{ color: '#4ade80', fontWeight: 'bold' }}>{currencySymbol}{change.new}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -423,11 +544,13 @@ export default function SettingsPage() {
         inventory,
         exchangeRates = {}, fetchRates,
         conversions, updateConversion, subtypes, getUnitsPerEmission,
-        checkAggregateStock, getBeerColor, updateBeerColor
+        checkAggregateStock, getBeerColor, updateBeerColor,
+        mainCurrency, setMainCurrency
     } = useProduct();
 
     const { user, role, organizationId, organizationName, signOut } = useAuth();
     const { theme, toggleTheme } = useTheme();
+    const { showNotification } = useNotification();
 
     const roleTranslations = {
         'OWNER': 'Administrador',
@@ -488,10 +611,10 @@ export default function SettingsPage() {
             await addBeerType(newBeerName.trim(), newBeerColor);
             setNewBeerName('');
             setNewBeerColor('#3b82f6');
-            alert('Producto agregado exitosamente');
+            showNotification('Producto agregado exitosamente', 'success');
         } catch (error) {
             console.error("Error adding beer:", error);
-            alert('Error al agregar el producto.');
+            showNotification('Error al agregar el producto.', 'error');
         }
     };
 
@@ -509,12 +632,12 @@ export default function SettingsPage() {
             const result = await addEmissionType(newEmissionName.trim(), 1, normalized);
             if (result.success) {
                 setNewEmissionName('');
-                alert('Tipo de emisión guardado!');
+                showNotification('Tipo de emisión guardado!', 'success');
             } else {
-                alert('Error: ' + result.error);
+                showNotification('Error: ' + result.error, 'error');
             }
         } else {
-            alert('Por favor ingresa un nombre.');
+            showNotification('Por favor ingresa un nombre.', 'warning');
         }
     };
 
@@ -622,6 +745,7 @@ export default function SettingsPage() {
                             }} />
                         </div>
                     </div>
+
                 </div>
             )}
 
@@ -683,6 +807,54 @@ export default function SettingsPage() {
                         <span style={{ fontSize: '0.8rem', color: '#999', marginBottom: '1rem' }}>
                             Última Actualización: {exchangeRates.lastUpdate || 'Nunca'}
                         </span>
+
+                        {/* Selector de Moneda Principal */}
+                        <div style={{
+                            background: 'var(--bg-card-hover)',
+                            padding: '1rem',
+                            borderRadius: '16px',
+                            marginBottom: '1.5rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            width: '100%',
+                            border: '1px solid var(--accent-light)'
+                        }}>
+                            <span style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Moneda Principal de Negocio</span>
+                            <div style={{ display: 'flex', gap: '1rem' }}>
+                                <button
+                                    onClick={() => setMainCurrency('USD')}
+                                    style={{
+                                        padding: '8px 16px',
+                                        borderRadius: '12px',
+                                        background: mainCurrency === 'USD' ? '#34c759' : 'transparent',
+                                        color: mainCurrency === 'USD' ? 'white' : 'var(--text-secondary)',
+                                        border: mainCurrency === 'USD' ? 'none' : '1px solid var(--accent-light)',
+                                        cursor: 'pointer',
+                                        fontWeight: 700,
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    Dolar BCV ($)
+                                </button>
+                                <button
+                                    onClick={() => setMainCurrency('EUR')}
+                                    style={{
+                                        padding: '8px 16px',
+                                        borderRadius: '12px',
+                                        background: mainCurrency === 'EUR' ? '#3b82f6' : 'transparent',
+                                        color: mainCurrency === 'EUR' ? 'white' : 'var(--text-secondary)',
+                                        border: mainCurrency === 'EUR' ? 'none' : '1px solid var(--accent-light)',
+                                        cursor: 'pointer',
+                                        fontWeight: 700,
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    Euro BCV (€)
+                                </button>
+                            </div>
+                        </div>
+
                         <button className="create-ticket-btn" onClick={fetchRates}>
                             Actualizar Tasas
                         </button>

@@ -7,7 +7,7 @@ export const initialProducts = [
 
 export const initialEmissions = [
     { id: '1', name: 'Unidad', units: 1 },
-    { id: '2', name: 'Caja', units: 12 } // Default, can be overridden by subtypes logic in Context
+    { id: '2', name: 'Caja', units: 36 } // Default, can be overridden by subtypes logic in Context
 ];
 
 export const initialInventory = [

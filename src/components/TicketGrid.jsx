@@ -5,7 +5,7 @@ import { useOrder } from '../context/OrderContext';
 import { Delete } from 'lucide-react';
 
 export default function TicketGrid({ orderId, item, itemIndex }) {
-    const { beerTypes, getPrice, getUnitsPerEmission, getBeerColor } = useProduct();
+    const { beerTypes, getPrice, getUnitsPerEmission, getBeerColor, currencySymbol } = useProduct();
     const { updateOrderItemSlot } = useOrder();
 
     const isLibre = item.emission === 'Libre';
@@ -142,12 +142,15 @@ export default function TicketGrid({ orderId, item, itemIndex }) {
 
                             // 1. PRICE LIMIT LOGIC (Variado)
                             if (item.beerVariety === 'Variado') {
-                                const anchorBeer = item.beerType;
+                                // Use baseBeer if available (Local Variado), fallback to beerType
+                                const anchorBeer = item.baseBeer || item.beerType;
+                                const mode = item.consumptionMode === 'Local' ? 'local' : 'standard';
+
                                 // Only filter if we have a valid anchor to compare against
                                 if (anchorBeer && !isLibre) {
                                     // Compare UNIT prices in the same subtype context
-                                    const anchorPrice = getPrice(anchorBeer, 'Unidad', item.subtype);
-                                    const optionPrice = getPrice(beer, 'Unidad', item.subtype);
+                                    const anchorPrice = getPrice(anchorBeer, 'Unidad', item.subtype, mode);
+                                    const optionPrice = getPrice(beer, 'Unidad', item.subtype, mode);
 
                                     // If option is more expensive than anchor (with epsilon), hide it
                                     if (optionPrice > anchorPrice + 0.001) {

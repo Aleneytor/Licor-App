@@ -10,7 +10,7 @@ import './CashPage.css'; // Premium Styles
 
 export default function CashPage() {
     const { pendingOrders } = useOrder();
-    const { getPrice, exchangeRates, inventory, beerTypes, subtypes } = useProduct();
+    const { getPrice, exchangeRates, inventory, beerTypes, subtypes, getUnitsPerEmission, currencySymbol } = useProduct();
 
     // Helper to calculate total for an order
     const getOrderTotal = (items) => {
@@ -63,11 +63,18 @@ export default function CashPage() {
                     if (methodCounts[method] !== undefined) methodCounts[method] += total;
                     else methodCounts['Otro'] += total;
 
-                    // Product Stats
+                    // Product Stats - Aggregated by Equivalent Units
                     order.items.forEach(item => {
                         const name = item.beerType || item.name;
+                        const emission = item.emission || 'Unidad';
+                        const subtype = item.subtype || 'Botella';
+
+                        // Calculate equivalent units
+                        const unitsPerPack = getUnitsPerEmission ? (getUnitsPerEmission(emission, subtype) || 1) : 1;
+                        const totalUnits = (item.quantity || 1) * unitsPerPack;
+
                         if (!productCounts[name]) productCounts[name] = 0;
-                        productCounts[name] += item.quantity;
+                        productCounts[name] += totalUnits;
                     });
                 }
             }
@@ -102,7 +109,7 @@ export default function CashPage() {
             topProducts: sortedProducts,
             lowStockConnect: alerts.slice(0, 5)
         };
-    }, [pendingOrders, getPrice, inventory, beerTypes, subtypes]);
+    }, [pendingOrders, getPrice, inventory, beerTypes, subtypes, getUnitsPerEmission]);
 
     // Export Function
     const handleExport = () => {
@@ -119,7 +126,7 @@ export default function CashPage() {
             'Hora': new Date(sale.closedAt).toLocaleTimeString(),
             'Pago': displayPayment(sale.paymentMethod),
             'Ref': sale.reference || '',
-            'Total ($)': parseFloat(sale.total.toFixed(2)),
+            [`Total (${currencySymbol})`]: parseFloat(sale.total.toFixed(2)),
             'Total (Bs)': parseFloat((sale.total * rate).toFixed(2)),
         }));
 
@@ -176,7 +183,7 @@ export default function CashPage() {
                 <div className="dashboard-card card-hero col-span-4">
                     <div>
                         <div className="label">Ventas Totales Hoy</div>
-                        <div className="value">${todayStats.totalSales.toFixed(2)}</div>
+                        <div className="value">{currencySymbol}{todayStats.totalSales.toFixed(2)}</div>
                         <div className="sub-value">
                             Bs {totalSalesBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                         </div>
@@ -209,7 +216,7 @@ export default function CashPage() {
                 <div className="dashboard-card col-span-4">
                     <h2 className="card-title">Ticket Promedio <Receipt size={18} className="text-secondary" /></h2>
                     <div className="stat-value" style={{ color: '#A78BFA' }}>
-                        ${todayStats.avgTicket.toFixed(2)}
+                        {currencySymbol}{todayStats.avgTicket.toFixed(2)}
                     </div>
                     <div className="stat-label">Por transacción cerrada</div>
                 </div>
@@ -222,7 +229,7 @@ export default function CashPage() {
                     <h2 className="card-title">Métodos de Pago</h2>
                     <div className="donut-chart-container" style={{ background: getDonutGradient() }}>
                         <div className="donut-inner">
-                            <span style={{ fontSize: '1.2rem', fontWeight: 800 }}>${todayStats.totalSales.toFixed(0)}</span>
+                            <span style={{ fontSize: '1.2rem', fontWeight: 800 }}>{currencySymbol}{todayStats.totalSales.toFixed(0)}</span>
                             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Total</span>
                         </div>
                     </div>
@@ -296,7 +303,7 @@ export default function CashPage() {
                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{displayPayment(sale.paymentMethod)}</span>
                                 </div>
                             </div>
-                            <span style={{ fontWeight: 700, color: '#34d399' }}>${sale.total.toFixed(2)}</span>
+                            <span style={{ fontWeight: 700, color: '#34d399' }}>{currencySymbol}{sale.total.toFixed(2)}</span>
                         </div>
                     ))}
                     {todaysSales.length === 0 && <span className="text-secondary text-sm">Sin transacciones hoy</span>}

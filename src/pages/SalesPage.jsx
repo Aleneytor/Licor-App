@@ -12,7 +12,7 @@ export default function SalesPage() {
     const {
         beerTypes, emissionOptions, getPrice, getBsPrice, getUsdPrice, subtypes,
         deductStock, checkStock, getUnitsPerEmission, checkAggregateStock,
-        getInventory, getEmissionsForSubtype
+        getInventory, getEmissionsForSubtype, currencySymbol
     } = useProduct();
     const { createOrder } = useOrder();
 
@@ -185,8 +185,8 @@ export default function SalesPage() {
     };
 
     const formatUsd = (amount) => {
-        if (isNaN(amount)) return '$0.00';
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        if (isNaN(amount)) return `${currencySymbol}0.00`;
+        return `${currencySymbol}${amount.toFixed(2)}`;
     };
 
     const currentTotal = calculateTotal();

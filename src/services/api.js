@@ -181,3 +181,10 @@ export const fetchEmissions = async () => {
     await delay();
     return { data: getStore(COLLECTION.EMISSIONS, initialEmissions), error: null };
 };
+
+export const resetDatabase = async () => {
+    Object.values(COLLECTION).forEach(key => localStorage.removeItem(key));
+    localStorage.removeItem('pendingOrders'); // Also clear pending orders from OrderContext
+    // We could reload page here, but UI should handle it.
+    return { success: true };
+};

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { useNotification } from './NotificationContext';
 // import { useRealtime } from '../hooks/useRealtime'; // REMOVED
 import {
     fetchProducts, createProduct, updateProduct,
@@ -14,6 +15,7 @@ export const useProduct = () => useContext(ProductContext);
 
 export const ProductProvider = ({ children }) => {
     const { user, organizationId } = useAuth();
+    const { showNotification } = useNotification();
 
     // Helper to load from storage (Fallback)
     const loadFromStorage = (key, fallback) => {
@@ -39,6 +41,15 @@ export const ProductProvider = ({ children }) => {
     const [prices, setPrices] = useState({});
     const [conversions, setConversions] = useState({});
     const [inventory, setInventory] = useState({});
+
+    // --- MAIN CURRENCY ---
+    const [mainCurrency, setMainCurrency] = useState(() => localStorage.getItem('mainCurrency') || 'USD');
+    const currencySymbol = mainCurrency === 'USD' ? '$' : '€';
+
+    // Persist Main Currency
+    useEffect(() => {
+        localStorage.setItem('mainCurrency', mainCurrency);
+    }, [mainCurrency]);
 
     // --- MOCK DATA SYNC ---
     useEffect(() => {
@@ -211,7 +222,7 @@ export const ProductProvider = ({ children }) => {
 
     const removeEmissionType = async (name, subtype) => {
         if (['Caja', 'Media Caja', 'Unidad'].includes(name)) {
-            alert('No se puede eliminar la emisión base.');
+            showNotification('No se puede eliminar la emisión base.', 'error');
             return;
         }
         try {
@@ -265,6 +276,9 @@ export const ProductProvider = ({ children }) => {
         const key = `${beer}_${emission}_${subtype}${suffix}`;
         const newPrice = parseFloat(price);
         setPrices(prev => ({ ...prev, [key]: newPrice }));
+
+        // NOTIFICATION - Removed to use local Popup instead as requested
+        // showNotification(`Precio actualizado: ${beer} (${emission}) - $${newPrice}`, 'success');
 
         const productId = productMap[beer];
         if (productId) {
@@ -338,23 +352,28 @@ export const ProductProvider = ({ children }) => {
         const conversionKey = `${emission}_${subtype}`;
         if (conversions[conversionKey]) return conversions[conversionKey];
 
-        // Find specific emission for this subtype
-        const dbEmission = rawEmissions.find(e => e.name === emission && e.subtype === subtype);
+        // Find specific emission for this subtype (Case Insensitive Subtype)
+        const dbEmission = rawEmissions.find(e =>
+            e.name === emission &&
+            (e.subtype === subtype || (e.subtype && subtype && e.subtype.toLowerCase() === subtype.toLowerCase()))
+        );
         if (dbEmission && dbEmission.units) return dbEmission.units;
 
-        // Fallback to legacy global (no subtype)
+        // Fallback to legacy (no subtype) or just name match if nothing else?
+        // If I defined "Combo" for "Botella", and I ask for "Combo" for "Botella", it matches above.
+        // What if I request "Combo" but the emission has no subtype defined (global)?
         const legacy = rawEmissions.find(e => e.name === emission && !e.subtype);
         if (legacy && legacy.units) return legacy.units;
 
         if (emission === 'Caja') {
             if (subtype && subtype.toLowerCase().includes('lata')) return 24;
-            if (subtype && subtype.toLowerCase().includes('tercio')) return 36;
-            return 12;
+            // Default to 36 (Tercio standard) for "Botella" as requested by user context
+            return 36;
         }
         if (emission === 'Media Caja') {
             if (subtype && subtype.toLowerCase().includes('lata')) return 12;
-            if (subtype && subtype.toLowerCase().includes('tercio')) return 18;
-            return 6;
+            // Default to 18 (Half Tercio) for "Botella"
+            return 18;
         }
         return 1;
     };
@@ -464,8 +483,9 @@ export const ProductProvider = ({ children }) => {
     };
 
     const getBsPrice = (beer, emission, subtype, mode = 'standard') => {
-        const usd = getPrice(beer, emission, subtype, mode);
-        return usd * (exchangeRates.bcv || 0);
+        const basePrice = getPrice(beer, emission, subtype, mode);
+        const rate = mainCurrency === 'USD' ? (exchangeRates.bcv || 0) : (exchangeRates.euro || 0);
+        return basePrice * rate;
     };
 
     // --- INVENTORY MANAGEMENT (CORREGIDO) ---
@@ -627,6 +647,10 @@ export const ProductProvider = ({ children }) => {
 
         setInventoryHistory(prev => [report, ...prev].slice(0, 50));
         setPendingInventory({});
+
+        // NOTIFICATION
+        showNotification(`${totalCount} Uds agregadas al inventario`, 'success');
+
         return report;
     };
 
@@ -711,6 +735,10 @@ export const ProductProvider = ({ children }) => {
         };
 
         setBreakageHistory(prev => [report, ...prev].slice(0, 50));
+
+        // NOTIFICATION
+        showNotification(`Reportada Merma: ${quantity} ${beer}`, 'warning');
+
         return report;
     };
 
@@ -763,7 +791,17 @@ export const ProductProvider = ({ children }) => {
             commitWaste,
             reportWaste, // Exposed
             getPendingWaste,
-            breakageHistory
+            getPendingWaste,
+            breakageHistory,
+            // Currency Config
+            mainCurrency,
+            setMainCurrency,
+            currencySymbol,
+            resetApp: async () => {
+                const { resetDatabase } = await import('../services/api');
+                await resetDatabase();
+                window.location.reload();
+            }
         }}>
             {children}
         </ProductContext.Provider>
