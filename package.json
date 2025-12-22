@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "update": "powershell -ExecutionPolicy Bypass -File ./update_app.ps1"
+    "update": "powershell -ExecutionPolicy Bypass -File ./update_app.ps1",
+    "upload": "powershell -ExecutionPolicy Bypass -File ./upload_app.ps1"
   },
   "dependencies": {
     "lucide-react": "^0.561.0",

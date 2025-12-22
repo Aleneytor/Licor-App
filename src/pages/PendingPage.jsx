@@ -320,24 +320,14 @@ export default function PendingPage() {
                 </div>
 
                 {/* Search Bar */}
-                <div className="search-bar-container" style={{ position: 'relative', width: '100%' }}>
-                    <Search className="search-icon" size={20} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                <div className="app-search-container">
+                    <Search className="app-search-icon" size={20} />
                     <input
                         type="text"
                         placeholder="Buscar por cliente o número de ticket..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="search-input"
-                        style={{
-                            width: '100%',
-                            padding: '12px 12px 12px 40px',
-                            borderRadius: '12px',
-                            border: '1px solid var(--accent-light)',
-                            background: 'var(--bg-card)',
-                            color: 'var(--text-primary)',
-                            fontSize: '0.95rem',
-                            outline: 'none'
-                        }}
+                        className="app-search-input"
                     />
                 </div>
             </header>

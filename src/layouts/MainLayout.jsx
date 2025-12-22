@@ -12,10 +12,41 @@ export default function MainLayout() {
         { path: '/ajustes', label: 'Ajustes', icon: Settings },
     ];
 
+    const [isCompact, setIsCompact] = React.useState(false);
+    const lastScrollY = React.useRef(0);
+
+    React.useEffect(() => {
+        const handleScroll = () => {
+            const currentScrollY = window.scrollY;
+
+            // Only trigger on mobile/tablet widths if needed, but CSS media queries handle the display.
+            // Logic: Scroll DOWN -> Compact (True), Scroll UP -> Expanded (False)
+            // Threshold: 50px to avoid jitter at very top
+
+            if (currentScrollY > 50) {
+                if (currentScrollY > lastScrollY.current) {
+                    // Scrolling DOWN
+                    setIsCompact(true);
+                } else {
+                    // Scrolling UP
+                    setIsCompact(false);
+                }
+            } else {
+                // At the top
+                setIsCompact(false);
+            }
+
+            lastScrollY.current = currentScrollY;
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
     return (
         <div className="layout-container">
-            <nav className="main-nav">
-                <div className="nav-pill">
+            <nav className={`main-nav ${isCompact ? 'compact-wrapper' : ''}`}>
+                <div className={`nav-pill ${isCompact ? 'compact' : ''}`}>
                     {navItems.map((item) => (
                         <NavLink
                             key={item.path}

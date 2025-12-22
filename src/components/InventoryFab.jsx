@@ -260,7 +260,7 @@ export default function InventoryFab() {
                                 REPORTE DE {isWasteAction ? 'MERMA' : 'MOVIMIENTOS'}
                             </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '200px', overflowY: 'auto' }}>
+                            <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '200px', overflowY: 'auto' }}>
                                 {lastReport.movements.map((mov, idx) => {
                                     // FIXED: Display the emission name directly (e.g. "Cajas") instead of trying to calculate fractions
                                     const extraInfo = mov.emission;
@@ -293,15 +293,16 @@ export default function InventoryFab() {
                         <button
                             onClick={handleClose}
                             style={{
-                                background: '#111827',
+                                background: isWasteAction ? 'linear-gradient(180deg, #F97316 0%, #EA580C 100%)' : 'linear-gradient(180deg, #FF9C57 0%, #E65900 100%)',
                                 color: 'white',
                                 width: '100%',
                                 padding: '12px',
                                 borderRadius: '12px',
                                 border: 'none',
-                                fontWeight: 600,
+                                fontWeight: 700,
                                 fontSize: '1rem',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 10px rgba(234, 88, 12, 0.2)'
                             }}
                         >
                             Entendido

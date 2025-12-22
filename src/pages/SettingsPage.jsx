@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
 // import { supabase } from '../supabaseClient';
-import { Trash2, Plus, Save, ChevronRight, ChevronLeft, CircleDollarSign, Users, Package, Star, Box, Send, LogOut, Moon, Sun, Store, ShoppingBag, Search, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Trash2, Plus, Save, ChevronRight, ChevronLeft, CircleDollarSign, Users, Package, Star, Box, Send, LogOut, Moon, Sun, Store, ShoppingBag, Search, ChevronDown, ChevronUp, X, Pencil } from 'lucide-react';
 import AccordionSection from '../components/AccordionSection';
 import StockManager from '../components/StockManager';
 import ContainerSelector from '../components/ContainerSelector';
@@ -568,6 +568,7 @@ export default function SettingsPage() {
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [pickerPos, setPickerPos] = useState({ top: 0, left: 0 });
     const [searchQuery, setSearchQuery] = useState('');
+    const [isEditMode, setIsEditMode] = useState(false); // NEW: Toggle for Edit Mode in Dashboard
 
     const toggleSettingSection = (section) => {
         setOpenSections(prev => ({
@@ -654,8 +655,8 @@ export default function SettingsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
             {[
                 { id: 'products', label: 'Gestion de Productos', icon: Package },
-                { id: 'inventory', label: 'Inventario', icon: Box },
                 { id: 'dashboard', label: 'Precios Actuales', icon: Star },
+                { id: 'inventory', label: 'Inventario', icon: Box },
                 { id: 'bcv', label: 'Tasas', icon: CircleDollarSign },
                 { id: 'users', label: 'Usuarios', icon: Users },
                 { id: 'app', label: 'Apariencia', icon: Sun },
@@ -913,20 +914,39 @@ export default function SettingsPage() {
             {currentView === 'dashboard' && (
                 <div style={{ display: 'grid', gap: '1rem' }}>
 
-                    {/* BUSCADOR */}
-                    <div className="input-group-large" style={{ marginBottom: '1rem', position: 'sticky', top: '70px', zIndex: 90, background: 'var(--bg-app)', padding: '0.5rem 0' }}>
-                        <div className="input-icon-external">
-                            <Search size={22} />
-                        </div>
+                    <div className="app-search-container">
+                        <Search className="app-search-icon" size={20} />
                         <input
                             type="text"
                             placeholder="Buscar cerveza, unidad, tipo..."
-                            className="ticket-input-large"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            style={{ boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}
+                            className="app-search-input"
                         />
                     </div>
+
+                    {/* TOGGLE EDIT MODE BUTTON */}
+                    <button
+                        onClick={() => setIsEditMode(!isEditMode)}
+                        style={{
+                            width: '100%',
+                            padding: '12px',
+                            borderRadius: '12px',
+                            // Orange Theme Logic: Adapted for Light/Dark
+                            background: theme === 'dark' ? 'rgba(234, 88, 12, 0.15)' : '#FFF7ED',
+                            color: theme === 'dark' ? '#FB923C' : '#EA580C',
+                            border: theme === 'dark' ? '1px solid rgba(234, 88, 12, 0.2)' : '1px solid #FFEDD5',
+                            fontWeight: 600,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: isEditMode ? '0 0 0 2px rgba(234, 88, 12, 0.4)' : 'none'
+                        }}
+                    >
+                        <Pencil size={18} />
+                        {isEditMode ? 'Terminar Edición' : 'Editar Precios'}
+                    </button>
+
 
                     {Array.isArray(beerTypes) && [...beerTypes]
                         .sort((a, b) => {
@@ -938,7 +958,11 @@ export default function SettingsPage() {
                             return scoreB - scoreA;
                         })
                         .map(beer => (
-                            <BeerDashboardCard key={beer} beerName={beer} searchFilter={searchQuery} />
+                            isEditMode ? (
+                                <BeerPriceEditor key={beer} beerName={beer} />
+                            ) : (
+                                <BeerDashboardCard key={beer} beerName={beer} searchFilter={searchQuery} />
+                            )
                         ))}
                     {(!beerTypes || beerTypes.length === 0) && (
                         <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
@@ -946,218 +970,197 @@ export default function SettingsPage() {
                         </div>
                     )}
                 </div>
-            )}
+            )
+            }
 
             {currentView === 'inventory' && <StockManager />}
 
-            {currentView === 'users' && (
-                <div className="order-summary-card">
-                    {/* ... (Sección de usuarios sin cambios) ... */}
-                    {/* Mantuve el código de usuarios original pero lo he resumido aquí para que quepa */}
-                    <div style={{ padding: '1.5rem', textAlign: 'center' }}>
-                        <div style={{ marginBottom: '2rem' }}>
-                            <div style={{ width: '64px', height: '64px', background: 'var(--bg-card-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
-                                <Users size={32} color="var(--text-primary)" />
+            {
+                currentView === 'users' && (
+                    <div className="order-summary-card">
+                        {/* ... (Sección de usuarios sin cambios) ... */}
+                        {/* Mantuve el código de usuarios original pero lo he resumido aquí para que quepa */}
+                        <div style={{ padding: '1.5rem', textAlign: 'center' }}>
+                            <div style={{ marginBottom: '2rem' }}>
+                                <div style={{ width: '64px', height: '64px', background: 'var(--bg-card-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
+                                    <Users size={32} color="var(--text-primary)" />
+                                </div>
+                                <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Gestión de Usuarios</h2>
+                                <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                                    <strong>Organización:</strong> <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{organizationName || 'Cargando...'}</span>
+                                </p>
                             </div>
-                            <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Gestión de Usuarios</h2>
-                            <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                                <strong>Organización:</strong> <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{organizationName || 'Cargando...'}</span>
-                            </p>
-                        </div>
-                        {/* Invite Logic */}
-                        {(role === 'OWNER' || !role) && (
-                            <div style={{ background: 'var(--bg-card-hover)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', textAlign: 'left' }}>
-                                <h3 style={{ fontSize: '1rem', marginBottom: '1rem', fontWeight: 600 }}>Invitar Nuevo Usuario</h3>
-                                <form onSubmit={handleInvite} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                    <div>
-                                        <label style={{ fontSize: '0.8rem', color: '#666', marginBottom: '4px', display: 'block' }}>Email</label>
-                                        <input type="email" placeholder="usuario@email.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required className="ticket-input-large" />
-                                    </div>
-                                    <button type="submit" disabled={inviteStatus === 'loading'} style={{ background: '#000', color: 'white', border: 'none', borderRadius: '12px', padding: '1rem', fontWeight: 600 }}>
-                                        {inviteStatus === 'loading' ? '...' : 'Invitar'}
-                                    </button>
-                                </form>
-                            </div>
-                        )}
-                        <button onClick={signOut} style={{ background: '#fee2e2', color: '#991b1b', padding: '1rem', borderRadius: '16px', border: 'none', width: '100%', fontWeight: 600 }}>Cerrar Sesión</button>
-                    </div>
-                </div>
-            )}
-
-            {currentView === 'products' && (
-                <>
-                    <AccordionSection title="Tipos de Cerveza" isOpen={!!openSections['beers']} onToggle={() => toggleSettingSection('beers')}>
-                        <div style={{ position: 'relative', marginBottom: '1rem' }}>
-                            <div className="input-group-large" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                                <button onClick={(e) => { const rect = e.target.getBoundingClientRect(); setPickerPos({ top: rect.bottom + 10, left: rect.left }); setShowColorPicker(!showColorPicker); }} style={{ width: '24px', height: '24px', borderRadius: '50%', background: newBeerColor, border: '2px solid #ddd', cursor: 'pointer', flexShrink: 0 }} />
-                                <input type="text" placeholder="Nueva Cerveza" className="ticket-input-large" value={newBeerName} onChange={(e) => setNewBeerName(e.target.value)} style={{ flex: 1 }} />
-                                <button onClick={handleAddBeer} className="option-btn selected" style={{ padding: '1rem', height: 'auto', borderRadius: '50%' }}><Plus size={24} /></button>
-                            </div>
-                            {showColorPicker && (
-                                <div style={{ position: 'fixed', top: pickerPos.top, left: pickerPos.left, zIndex: 1000, background: 'white', padding: '1rem', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', width: '280px' }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px' }}>
-                                        {presetColors.map(color => (
-                                            <button key={color} onClick={() => { setNewBeerColor(color); setShowColorPicker(false); }} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: color, border: newBeerColor === color ? '3px solid #000' : '2px solid transparent' }} />
-                                        ))}
-                                    </div>
+                            {/* Invite Logic */}
+                            {(role === 'OWNER' || !role) && (
+                                <div style={{ background: 'var(--bg-card-hover)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', textAlign: 'left' }}>
+                                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem', fontWeight: 600 }}>Invitar Nuevo Usuario</h3>
+                                    <form onSubmit={handleInvite} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', color: '#666', marginBottom: '4px', display: 'block' }}>Email</label>
+                                            <input type="email" placeholder="usuario@email.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required className="ticket-input-large" />
+                                        </div>
+                                        <button type="submit" disabled={inviteStatus === 'loading'} style={{ background: '#000', color: 'white', border: 'none', borderRadius: '12px', padding: '1rem', fontWeight: 600 }}>
+                                            {inviteStatus === 'loading' ? '...' : 'Invitar'}
+                                        </button>
+                                    </form>
                                 </div>
                             )}
+                            <button onClick={signOut} style={{ background: '#fee2e2', color: '#991b1b', padding: '1rem', borderRadius: '16px', border: 'none', width: '100%', fontWeight: 600 }}>Cerrar Sesión</button>
                         </div>
-                        <div className="options-grid" style={{ gridTemplateColumns: '1fr', gap: '0.5rem' }}>
-                            {Array.isArray(beerTypes) && beerTypes.map(beer => {
-                                const color = getBeerColor(beer);
-                                return (
-                                    <div key={beer} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--bg-card-hover)', borderRadius: '12px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: color.raw || color.bg }}></div>
-                                            <span style={{ fontWeight: 500 }}>{beer}</span>
-                                        </div>
-                                        <button onClick={() => removeBeerType(beer)} style={{ color: '#ff3b30', background: 'none', border: 'none' }}><Trash2 size={20} /></button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </AccordionSection>
+                    </div>
+                )
+            }
 
-                    {/* --- SECCIÓN ACTUALIZADA DE EMISIONES --- */}
-                    <AccordionSection
-                        title="Formas de Emisión"
-                        isOpen={!!openSections['emissions']}
-                        onToggle={() => toggleSettingSection('emissions')}
-                    >
-                        <div style={{ marginBottom: '1rem' }}>
-                            <label className="text-secondary text-sm">Configurar para:</label>
-                            <ContainerSelector value={selectedConversionSubtype} onChange={setSelectedConversionSubtype} />
-                        </div>
-
-                        {/* INPUTS NUEVOS: Nombre (Sin Unidades) */}
-                        <div className="input-group-large" style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-                            <input
-                                type="text"
-                                placeholder="Nombre (ej: Pack)"
-                                className="ticket-input-large"
-                                value={newEmissionName}
-                                onChange={(e) => setNewEmissionName(e.target.value)}
-                                style={{ flex: 1 }}
-                            />
-                            <button onClick={handleAddEmission} className="option-btn selected" style={{ padding: '1rem', height: 'auto', borderRadius: '50%' }}>
-                                <Plus size={24} />
-                            </button>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            {getEmissionsForSubtype(normalizeSubtype(selectedConversionSubtype)).map(emission => {
-                                const isBase = ['Unidad', 'Caja', 'Media Caja', 'Six Pack'].includes(emission);
-                                const normalizedSubtype = normalizeSubtype(selectedConversionSubtype);
-                                const currentUnits = getUnitsPerEmission(emission, normalizedSubtype);
-                                const isLocked = emission === 'Unidad' || emission === 'Six Pack';
-
-                                return (
-                                    <div key={emission} style={{
-                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                        padding: '0.8rem 1rem',
-                                        marginBottom: '0.75rem',
-                                        background: 'var(--bg-card-hover)',
-                                        borderRadius: '12px',
-                                        border: '1px solid var(--accent-light)'
-                                    }}>
-                                        <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{emission}</span>
-
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-
-                                            {/* Control Group */}
-                                            <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-app)', borderRadius: '8px', border: '1px solid var(--accent-light)', padding: '2px' }}>
-                                                <button
-                                                    onClick={() => updateConversion(emission, Math.max(1, parseInt(currentUnits || 0) - 1), normalizedSubtype)}
-                                                    disabled={isLocked}
-                                                    style={{ width: '30px', height: '30px', border: 'none', background: 'transparent', color: 'var(--text-secondary)', cursor: isLocked ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 700 }}
-                                                >
-                                                    -
-                                                </button>
-
-                                                <input
-                                                    type="number"
-                                                    className="no-spin"
-                                                    style={{
-                                                        width: '45px',
-                                                        textAlign: 'center',
-                                                        border: 'none',
-                                                        background: 'transparent',
-                                                        color: 'var(--text-primary)',
-                                                        fontWeight: '700',
-                                                        fontSize: '0.95rem',
-                                                        outline: 'none',
-                                                        appearance: 'textfield',
-                                                        MozAppearance: 'textfield'
-                                                    }}
-                                                    value={currentUnits}
-                                                    onChange={(e) => updateConversion(emission, e.target.value, normalizedSubtype)}
-                                                    disabled={isLocked}
-                                                />
-
-                                                <button
-                                                    onClick={() => updateConversion(emission, parseInt(currentUnits || 0) + 1, normalizedSubtype)}
-                                                    disabled={isLocked}
-                                                    style={{ width: '30px', height: '30px', border: 'none', background: 'transparent', color: 'var(--text-primary)', cursor: isLocked ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                                >
-                                                    <Plus size={16} />
-                                                </button>
-                                            </div>
-
-                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Uds</span>
-
-                                            {!isBase ? (
-                                                <button
-                                                    onClick={() => removeEmissionType(emission, normalizedSubtype)}
-                                                    style={{
-                                                        width: '32px', height: '32px',
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                        background: 'rgba(239, 68, 68, 0.15)',
-                                                        border: 'none',
-                                                        borderRadius: '8px',
-                                                        color: '#ef4444',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            ) : (
-                                                <div style={{ width: '32px' }}></div>
-                                            )}
+            {
+                currentView === 'products' && (
+                    <>
+                        <AccordionSection title="Tipos de Cerveza" isOpen={!!openSections['beers']} onToggle={() => toggleSettingSection('beers')}>
+                            <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                                <div className="input-group-large" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                    <button onClick={(e) => { const rect = e.target.getBoundingClientRect(); setPickerPos({ top: rect.bottom + 10, left: rect.left }); setShowColorPicker(!showColorPicker); }} style={{ width: '24px', height: '24px', borderRadius: '50%', background: newBeerColor, border: '2px solid #ddd', cursor: 'pointer', flexShrink: 0 }} />
+                                    <input type="text" placeholder="Nueva Cerveza" className="ticket-input-large" value={newBeerName} onChange={(e) => setNewBeerName(e.target.value)} style={{ flex: 1 }} />
+                                    <button onClick={handleAddBeer} className="option-btn selected" style={{ padding: '1rem', height: 'auto', borderRadius: '50%' }}><Plus size={24} /></button>
+                                </div>
+                                {showColorPicker && (
+                                    <div style={{ position: 'fixed', top: pickerPos.top, left: pickerPos.left, zIndex: 1000, background: 'white', padding: '1rem', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', width: '280px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px' }}>
+                                            {presetColors.map(color => (
+                                                <button key={color} onClick={() => { setNewBeerColor(color); setShowColorPicker(false); }} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: color, border: newBeerColor === color ? '3px solid #000' : '2px solid transparent' }} />
+                                            ))}
                                         </div>
                                     </div>
-                                );
-                            })}</div>
-                    </AccordionSection>
-
-                    <AccordionSection title="Configurar Precios" isOpen={!!openSections['pricing']} onToggle={() => toggleSettingSection('pricing')}>
-                        <div style={{ marginBottom: '1rem' }}>
-                            <label className="section-label">Selecciona Cerveza</label>
-                            <div className="options-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '0.5rem' }}>
-                                {Array.isArray(beerTypes) && beerTypes.map(beer => (
-                                    <button
-                                        key={beer}
-                                        className={`option-btn ${selectedBeer === beer ? 'selected' : ''}`}
-                                        onClick={() => setSelectedBeer(selectedBeer === beer ? null : beer)}
-                                        style={selectedBeer === beer ? {
-                                            backgroundColor: getBeerColor(beer).bg,
-                                            color: getBeerColor(beer).text,
-                                            borderColor: getBeerColor(beer).border,
-                                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.2)'
-                                        } : {}}
-                                    >
-                                        {beer}
-                                    </button>
-                                ))}
+                                )}
                             </div>
-                        </div>
+                            <div className="options-grid" style={{ gridTemplateColumns: '1fr', gap: '0.5rem' }}>
+                                {Array.isArray(beerTypes) && beerTypes.map(beer => {
+                                    const color = getBeerColor(beer);
+                                    return (
+                                        <div key={beer} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--bg-card-hover)', borderRadius: '12px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: color.raw || color.bg }}></div>
+                                                <span style={{ fontWeight: 500 }}>{beer}</span>
+                                            </div>
+                                            <button onClick={() => removeBeerType(beer)} style={{ color: '#ff3b30', background: 'none', border: 'none' }}><Trash2 size={20} /></button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </AccordionSection>
 
-                        {selectedBeer && (
-                            <BeerPriceEditor beerName={selectedBeer} />
-                        )}
-                    </AccordionSection>
-                </>
-            )}
-        </div>
+                        {/* --- SECCIÓN ACTUALIZADA DE EMISIONES --- */}
+                        <AccordionSection
+                            title="Formas de Emisión"
+                            isOpen={!!openSections['emissions']}
+                            onToggle={() => toggleSettingSection('emissions')}
+                        >
+                            <div style={{ marginBottom: '1rem' }}>
+                                <label className="text-secondary text-sm">Configurar para:</label>
+                                <ContainerSelector value={selectedConversionSubtype} onChange={setSelectedConversionSubtype} />
+                            </div>
+
+                            {/* INPUTS NUEVOS: Nombre (Sin Unidades) */}
+                            <div className="input-group-large" style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
+                                <input
+                                    type="text"
+                                    placeholder="Nombre (ej: Pack)"
+                                    className="ticket-input-large"
+                                    value={newEmissionName}
+                                    onChange={(e) => setNewEmissionName(e.target.value)}
+                                    style={{ flex: 1 }}
+                                />
+                                <button onClick={handleAddEmission} className="option-btn selected" style={{ padding: '1rem', height: 'auto', borderRadius: '50%' }}>
+                                    <Plus size={24} />
+                                </button>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {getEmissionsForSubtype(normalizeSubtype(selectedConversionSubtype)).map(emission => {
+                                    const isBase = ['Unidad', 'Caja', 'Media Caja', 'Six Pack'].includes(emission);
+                                    const normalizedSubtype = normalizeSubtype(selectedConversionSubtype);
+                                    const currentUnits = getUnitsPerEmission(emission, normalizedSubtype);
+                                    const isLocked = emission === 'Unidad' || emission === 'Six Pack';
+
+                                    return (
+                                        <div key={emission} style={{
+                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                            padding: '0.8rem 1rem',
+                                            marginBottom: '0.75rem',
+                                            background: 'var(--bg-card-hover)',
+                                            borderRadius: '12px',
+                                            border: '1px solid var(--accent-light)'
+                                        }}>
+                                            <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{emission}</span>
+
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+
+                                                {/* Control Group */}
+                                                <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-app)', borderRadius: '8px', border: '1px solid var(--accent-light)', padding: '2px' }}>
+                                                    <button
+                                                        onClick={() => updateConversion(emission, Math.max(1, parseInt(currentUnits || 0) - 1), normalizedSubtype)}
+                                                        disabled={isLocked}
+                                                        style={{ width: '30px', height: '30px', border: 'none', background: 'transparent', color: 'var(--text-secondary)', cursor: isLocked ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 700 }}
+                                                    >
+                                                        -
+                                                    </button>
+
+                                                    <input
+                                                        type="number"
+                                                        className="no-spin"
+                                                        style={{
+                                                            width: '45px',
+                                                            textAlign: 'center',
+                                                            border: 'none',
+                                                            background: 'transparent',
+                                                            color: 'var(--text-primary)',
+                                                            fontWeight: '700',
+                                                            fontSize: '0.95rem',
+                                                            outline: 'none',
+                                                            appearance: 'textfield',
+                                                            MozAppearance: 'textfield'
+                                                        }}
+                                                        value={currentUnits}
+                                                        onChange={(e) => updateConversion(emission, e.target.value, normalizedSubtype)}
+                                                        disabled={isLocked}
+                                                    />
+
+                                                    <button
+                                                        onClick={() => updateConversion(emission, parseInt(currentUnits || 0) + 1, normalizedSubtype)}
+                                                        disabled={isLocked}
+                                                        style={{ width: '30px', height: '30px', border: 'none', background: 'transparent', color: 'var(--text-primary)', cursor: isLocked ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                    >
+                                                        <Plus size={16} />
+                                                    </button>
+                                                </div>
+
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Uds</span>
+
+                                                {!isBase ? (
+                                                    <button
+                                                        onClick={() => removeEmissionType(emission, normalizedSubtype)}
+                                                        style={{
+                                                            width: '32px', height: '32px',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            background: 'rgba(239, 68, 68, 0.15)',
+                                                            border: 'none',
+                                                            borderRadius: '8px',
+                                                            color: '#ef4444',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                ) : (
+                                                    <div style={{ width: '32px' }}></div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}</div>
+                        </AccordionSection>
+
+                    </>
+                )
+            }
+        </div >
     );
 }

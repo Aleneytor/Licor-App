@@ -76,6 +76,7 @@
 
 /* Mobile Media Query */
 @media (max-width: 768px) {
+
     .main-nav {
         position: fixed;
         top: auto;
@@ -84,6 +85,13 @@
         padding: 0 1rem;
         background: none;
         pointer-events: none;
+        transition: bottom 0.3s ease;
+    }
+
+    /* COMPACT MODE WRAPPER ADJSUTMENTS */
+    .main-nav.compact-wrapper {
+        bottom: 0.5rem;
+        /* Slightly lower */
     }
 
     .nav-pill {
@@ -95,6 +103,25 @@
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
         padding: 0.5rem;
         /* Tighter padding container */
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        height: auto;
+    }
+
+    /* COMPACT MODE PILL */
+    .nav-pill.compact {
+        width: 80%;
+        /* Shrink width */
+        margin: 0 auto;
+        /* Center it */
+        padding: 0.4rem;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        /* Slightly transparent */
+        backdrop-filter: blur(10px);
+    }
+
+    .dark .nav-pill.compact {
+        background: rgba(30, 30, 30, 0.95);
     }
 
     .dark .nav-pill {
@@ -109,11 +136,37 @@
         padding: 0.5rem 0;
         /* Remove horizontal padding entirely */
         border-radius: var(--radius-full);
+        transition: all 0.3s ease;
+    }
+
+    /* COMPACT MODE ITEM */
+    .nav-pill.compact .nav-item {
+        padding: 0.25rem 0;
     }
 
     .nav-label {
         font-size: 0.65rem;
         /* Smaller text for mobile */
+        transition: all 0.2s ease;
+        max-height: 20px;
+        /* Approximate height */
+        opacity: 1;
+        overflow: hidden;
+    }
+
+    /* COMPACT MODE LABEL & ICON */
+    .nav-pill.compact .nav-label {
+        max-height: 0;
+        opacity: 0;
+        margin: 0;
+    }
+
+    .nav-icon {
+        transition: transform 0.3s ease;
+    }
+
+    .nav-pill.compact .nav-icon {
+        transform: scale(0.9);
     }
 
     .main-content {

@@ -120,15 +120,65 @@ export default function CashPage() {
 
         const rate = exchangeRates.bcv || 0;
 
-        const summaryData = todaysSales.map(sale => ({
-            'Ticket': sale.ticketNumber,
-            'Cliente': sale.customerName,
-            'Hora': new Date(sale.closedAt).toLocaleTimeString(),
-            'Pago': displayPayment(sale.paymentMethod),
-            'Ref': sale.reference || '',
-            [`Total (${currencySymbol})`]: parseFloat(sale.total.toFixed(2)),
-            'Total (Bs)': parseFloat((sale.total * rate).toFixed(2)),
-        }));
+        const summaryData = todaysSales.map(sale => {
+            // 1. Detailed Consumption Logic
+            const consumptionMap = {};
+            const uniqueBeers = new Set();
+
+            sale.items.forEach(item => {
+                const name = item.beerType || item.name;
+                const subtype = item.subtype || 'Botella'; // Fallback
+                const emission = item.emission || 'Unidad';
+                const qty = item.quantity || 1;
+
+                // Aggregate Consumption
+                const key = `${name} (${subtype})`;
+                if (!consumptionMap[key]) consumptionMap[key] = 0;
+
+                // If it's a pack, we might want to say "1 Caja Zulia" or converted units. 
+                // Request says "4 Zulias, 5 Polar". Let's stick to the emission name for clarity or just Count + Name.
+                // "4 Caja Zulia" or "4 Zulia". 
+                // Let's use: "Qty Emission Name" e.g. "1 Caja Zulia"
+                // But if they want "4 Zulias", maybe they mean units? 
+                // Given the example "4 Zulias, 5 Polar Light", it sounds like total quantity or packs.
+                // Let's group by Name only for the simplified string if possible, or keep it granular?
+                // Granular is safer: "1 Caja Zulia, 5 Unidad Polar"
+                // Let's try to group by Beer Name for the "4 Zulias" style if possible, but units vary (Caja vs Unidad).
+                // Better approach: "Qty Emission Name" is unambiguous.
+
+                const detailKey = `${name} ${emission}`;
+                if (!consumptionMap[detailKey]) consumptionMap[detailKey] = 0;
+                consumptionMap[detailKey] += qty;
+
+                uniqueBeers.add(`${name}|${subtype}`);
+            });
+
+            const consumptionStr = Object.entries(consumptionMap)
+                .map(([k, v]) => `${v} ${k}`)
+                .join(', ');
+
+            // 2. Inventory Logic (Current Snapshot)
+            // "Zulia: 45, Polar: 12"
+            const stockStr = Array.from(uniqueBeers).map(beerKey => {
+                const [name, subtype] = beerKey.split('|');
+                // Look up in global inventory
+                const invKey = `${name}_${subtype}`;
+                const qty = inventory[invKey] || 0;
+                return `${name} (${subtype}): ${qty}`;
+            }).join(', ');
+
+            return {
+                'Ticket': sale.ticketNumber,
+                'Cliente': sale.customerName,
+                'Hora': new Date(sale.closedAt).toLocaleTimeString(),
+                'Pago': displayPayment(sale.paymentMethod),
+                'Ref': sale.reference || '',
+                'Detalle Consumo': consumptionStr,
+                'Stock Actual (Ref)': stockStr,
+                [`Total (${currencySymbol})`]: parseFloat(sale.total.toFixed(2)),
+                'Total (Bs)': parseFloat((sale.total * rate).toFixed(2)),
+            };
+        });
 
         const ws = XLSX.utils.json_to_sheet(summaryData);
         const wb = XLSX.utils.book_new();
