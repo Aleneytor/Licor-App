@@ -44,6 +44,15 @@ export default function CashPage() {
         return method;
     };
 
+    const getShortPayment = (method) => {
+        const full = displayPayment(method);
+        if (full.includes('Efectivo')) return 'EF';
+        if (full.includes('Pago Móvil') || full.includes('Pago Movil')) return 'PM';
+        if (full.includes('Bio Pago') || full.includes('BioPago')) return 'BP';
+        if (full.includes('Punto')) return 'PU';
+        return full.substring(0, 2).toUpperCase();
+    };
+
     // --- ANALYTICS ---
     const {
         todayStats,
@@ -425,8 +434,11 @@ export default function CashPage() {
                                 <div className="th-cell">Cliente</div>
                                 <div className="th-cell">Fecha</div>
                                 <div className="th-cell">Pago</div>
-                                <div className="th-cell" style={{ flex: 2 }}>Detalle de Consumo</div>
-                                <div className="th-cell">Usuario</div>
+                                <div className="th-cell consumption-cell" style={{ flex: 2 }}>
+                                    <span className="desktop-header">Detalle de Consumo</span>
+                                    <span className="mobile-header">Consumo</span>
+                                </div>
+                                <div className="th-cell user-header">Usuario</div>
                             </div>
 
                             {/* Table Body */}
@@ -435,19 +447,20 @@ export default function CashPage() {
                                     todaysSales.map((sale) => (
                                         <div key={sale.id} className="table-row">
                                             <div className="td-cell">
-                                                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{sale.customerName}</div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>#{sale.ticketNumber}</div>
+                                                <div className="customer-name" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{sale.customerName}</div>
+                                                <div className="ticket-number" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>#{sale.ticketNumber}</div>
                                             </div>
-                                            <div className="td-cell">
-                                                <div style={{ fontSize: '0.9rem' }}>{new Date(sale.closedAt).toLocaleDateString()}</div>
+                                            <div className="td-cell date-cell">
+                                                <div className="date-text">{new Date(sale.closedAt).toLocaleDateString()}</div>
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{new Date(sale.closedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                             </div>
                                             <div className="td-cell">
                                                 <span className="badge-payment">
-                                                    {displayPayment(sale.paymentMethod)}
+                                                    <span className="long-method">{displayPayment(sale.paymentMethod)}</span>
+                                                    <span className="short-method">{getShortPayment(sale.paymentMethod)}</span>
                                                 </span>
                                             </div>
-                                            <div className="td-cell" style={{ flex: 2, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                            <div className="td-cell consumption-cell" style={{ flex: 2 }}>
                                                 {sale.items.map(item => {
                                                     const qty = item.quantity || 1;
                                                     const name = item.beerType || item.name;
@@ -455,12 +468,12 @@ export default function CashPage() {
                                                     return `${qty} ${name} (${emission})`;
                                                 }).join(', ')}
                                             </div>
-                                            <div className="td-cell">
+                                            <div className="td-cell user-cell">
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--accent-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <div className="user-icon-container" style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--accent-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                                         <User size={14} color="white" />
                                                     </div>
-                                                    <span style={{ fontSize: '0.9rem' }}>{sale.createdBy || 'N/A'}</span>
+                                                    <span className="user-name">{sale.createdBy || 'N/A'}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -474,7 +487,7 @@ export default function CashPage() {
 
                             {/* Table Footer */}
                             <div className="table-footer">
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                <div className="footer-info">
                                     <AlertCircle size={16} />
                                     <span>Descarga el Excel para ver un reporte completo</span>
                                 </div>
@@ -690,7 +703,7 @@ export default function CashPage() {
                     <div className="report-modal-content" onClick={e => e.stopPropagation()}>
                         <div className="report-modal-header">
                             <div>
-                                <h3 className="text-xl font-bold text-primary">Reporte Diario Completo</h3>
+                                <h3 className="text-xl font-bold text-primary">Reportes Detallados</h3>
                                 <p className="text-sm text-secondary">{new Date().toLocaleDateString()}</p>
                             </div>
                             <button className="close-btn" onClick={() => setShowReportModal(false)}>
@@ -712,7 +725,7 @@ export default function CashPage() {
                                                     {sale.customerName}
                                                 </div>
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                                                    {new Date(sale.closedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • #{sale.ticketNumber}
+                                                    {new Date(sale.closedAt).toLocaleDateString()} • {new Date(sale.closedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • #{sale.ticketNumber}
                                                 </div>
                                             </div>
                                             <div className="payment-badge-pill" style={{ background: `${methodColor}15`, color: methodColor }}>
@@ -772,35 +785,33 @@ export default function CashPage() {
                     return (
                         <div className="report-modal-overlay" onClick={() => { setShowWeeklyModal(false); setWeekOffset(0); }}>
                             <div className="report-modal-content weekly-modal-content" onClick={e => e.stopPropagation()}>
-                                <div className="report-modal-header">
-                                    <div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <button
-                                                className="nav-btn"
-                                                onClick={() => setWeekOffset(prev => prev + 1)}
-                                                style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-primary)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '8px', padding: '4px', cursor: 'pointer' }}
-                                            >
-                                                <ChevronLeft size={20} />
-                                            </button>
-                                            <h2 style={{ fontSize: '1.2rem', fontWeight: 800 }}>
-                                                {weekOffset === 0 ? 'Esta Semana' : weekOffset === 1 ? 'Semana Pasada' : `Hace ${weekOffset} semanas`}
-                                            </h2>
-                                            <button
-                                                className="nav-btn"
-                                                onClick={() => setWeekOffset(prev => Math.max(0, prev - 1))}
-                                                disabled={weekOffset === 0}
-                                                style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-primary)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '8px', padding: '4px', opacity: weekOffset === 0 ? 0.3 : 1, cursor: weekOffset === 0 ? 'default' : 'pointer' }}
-                                            >
-                                                <ChevronRight size={20} />
-                                            </button>
-                                        </div>
-                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                <div className="report-modal-header weekly-modal-header">
+                                    <div className="weekly-header-top">
+                                        <h2 className="weekly-title">
+                                            {weekOffset === 0 ? 'Esta Semana' : weekOffset === 1 ? 'Semana Pasada' : `Hace ${weekOffset} semanas`}
+                                        </h2>
+                                        <button className="close-btn" onClick={() => { setShowWeeklyModal(false); setWeekOffset(0); }}>
+                                            <X size={20} />
+                                        </button>
+                                    </div>
+                                    <div className="weekly-nav-section">
+                                        <button
+                                            className="nav-btn"
+                                            onClick={() => setWeekOffset(prev => prev + 1)}
+                                        >
+                                            <ChevronLeft size={20} />
+                                        </button>
+                                        <p className="weekly-range">
                                             {formatDate(selectedWeek.start)} - {formatDate(selectedWeek.end)}
                                         </p>
+                                        <button
+                                            className="nav-btn"
+                                            onClick={() => setWeekOffset(prev => Math.max(0, prev - 1))}
+                                            disabled={weekOffset === 0}
+                                        >
+                                            <ChevronRight size={20} />
+                                        </button>
                                     </div>
-                                    <button className="close-btn" style={{ color: 'var(--text-primary)' }} onClick={() => { setShowWeeklyModal(false); setWeekOffset(0); }}>
-                                        <X size={24} />
-                                    </button>
                                 </div>
 
                                 <div className="report-modal-body">

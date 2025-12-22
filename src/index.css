@@ -13,6 +13,7 @@
 
   --accent: #000000;
   --accent-light: #e5e5ea;
+  --accent-color: #F97316;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -49,6 +50,7 @@
 
   --accent: #ffffff;
   --accent-light: #3a3a3c;
+  --accent-color: #F97316;
 
   /* Adjust shadows for dark mode visibility (often lighter/glowy or just subtler) */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -156,6 +158,7 @@ input[type=number].no-spin::-webkit-outer-spin-button {
 }
 
 input[type=number].no-spin {
+  appearance: textfield;
   -moz-appearance: textfield;
 }
 

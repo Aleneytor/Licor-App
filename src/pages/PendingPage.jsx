@@ -370,8 +370,8 @@ export default function PendingPage() {
 
             {/* Quick Add Modal */}
             {selectedOrder && (
-                <div className="pending-modal-overlay">
-                    <div className="pending-modal-content">
+                <div className="pending-modal-overlay" onClick={() => setSelectedOrder(null)}>
+                    <div className="pending-modal-content" onClick={e => e.stopPropagation()}>
                         <div className="pending-modal-header">
                             <div>
                                 <h3 className="pending-modal-title">Agregar Producto</h3>
@@ -440,8 +440,8 @@ export default function PendingPage() {
 
             {/* WASTE REPORT MODAL */}
             {showWasteModal && (
-                <div className="pending-modal-overlay">
-                    <div className="pending-modal-content" style={{ maxWidth: '400px' }}>
+                <div className="pending-modal-overlay" onClick={() => setShowWasteModal(false)}>
+                    <div className="pending-modal-content" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
                         <div className="pending-modal-header">
                             <div>
                                 <h3 className="pending-modal-title" style={{ color: '#BE123C' }}>Reportar Merma</h3>
@@ -522,8 +522,8 @@ export default function PendingPage() {
                     const hasPredefinedPayment = !!orderToClose.paymentMethod;
 
                     return (
-                        <div className="pending-modal-overlay">
-                            <div className="pending-modal-content" style={{ maxWidth: '400px' }}>
+                        <div className="pending-modal-overlay" onClick={() => { setClosingOrderId(null); setPaymentMethod(null); setPaymentReference(''); }}>
+                            <div className="pending-modal-content" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
                                 <div className="pending-modal-header">
                                     <h3 className="pending-modal-title">Confirmar Entrega</h3>
                                     <button className="close-btn" onClick={() => { setClosingOrderId(null); setPaymentMethod(null); setPaymentReference(''); }}>

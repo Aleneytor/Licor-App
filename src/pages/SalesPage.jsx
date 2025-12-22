@@ -599,8 +599,12 @@ export default function SalesPage() {
 
             {/* --- MIXED BUILDER MODAL --- */}
             {showMixedBuilder && (
-                <div className="modal-overlay">
-                    <div className="modal-content" style={{ maxWidth: '400px', width: '95%' }}>
+                <div className="modal-overlay" onClick={() => setShowMixedBuilder(false)}>
+                    <div
+                        className="modal-content"
+                        style={{ maxWidth: '400px', width: '95%' }}
+                        onClick={e => e.stopPropagation()}
+                    >
                         <h3 className="modal-title">Armar {orderState.emission}</h3>
 
                         {/* Progress Bar */}
@@ -645,7 +649,19 @@ export default function SalesPage() {
                                             <button
                                                 onClick={() => addToMix(beer)}
                                                 disabled={isMaxed || stock <= 0}
-                                                style={{ width: '32px', height: '32px', borderRadius: '50%', background: (isMaxed || stock <= 0) ? 'var(--bg-card-hover)' : 'var(--accent-color)', color: 'white', border: 'none' }}
+                                                style={{
+                                                    width: '32px',
+                                                    height: '32px',
+                                                    borderRadius: '50%',
+                                                    background: (isMaxed || stock <= 0) ? 'var(--accent-light)' : 'var(--accent-color)',
+                                                    color: (isMaxed || stock <= 0) ? 'var(--text-muted)' : 'white',
+                                                    border: 'none',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: '1.2rem',
+                                                    fontWeight: '600'
+                                                }}
                                             >
                                                 +
                                             </button>
@@ -660,15 +676,32 @@ export default function SalesPage() {
                             Precio Estimado: <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{formatCurrency(getMixedBsPrice(orderState.consumptionMode === 'Local' ? 'local' : 'standard'))} Bs</span>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button className="modal-close-btn" onClick={() => setShowMixedBuilder(false)} style={{ background: 'var(--bg-card-hover)', color: 'var(--text-primary)' }}>
+                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
+                            <button
+                                className="modal-close-btn"
+                                onClick={() => setShowMixedBuilder(false)}
+                                style={{
+                                    background: 'var(--accent-light)',
+                                    color: 'var(--text-primary)',
+                                    fontWeight: '600',
+                                    flex: 1,
+                                    maxWidth: '160px'
+                                }}
+                            >
                                 Cancelar
                             </button>
                             <button
                                 className="modal-close-btn"
                                 onClick={confirmMixedCase}
                                 disabled={getMixedTotalUnits() !== getTargetUnits()}
-                                style={{ background: getMixedTotalUnits() === getTargetUnits() ? '#34c759' : '#ccc', color: 'white' }}
+                                style={{
+                                    background: getMixedTotalUnits() === getTargetUnits() ? '#34c759' : 'var(--bg-card-hover)',
+                                    color: getMixedTotalUnits() === getTargetUnits() ? 'white' : 'var(--text-muted)',
+                                    fontWeight: '700',
+                                    flex: 1,
+                                    maxWidth: '160px',
+                                    opacity: getMixedTotalUnits() === getTargetUnits() ? 1 : 0.6
+                                }}
                             >
                                 Confirmar
                             </button>

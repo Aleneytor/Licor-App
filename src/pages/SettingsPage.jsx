@@ -516,13 +516,13 @@ const BeerPriceEditor = ({ beerName, searchFilter = '' }) => {
                     <div
                         onClick={e => e.stopPropagation()}
                         style={{
-                            backgroundColor: 'rgba(28, 28, 30, 0.95)',
+                            backgroundColor: 'var(--bg-card)',
                             backdropFilter: 'blur(12px)',
                             WebkitBackdropFilter: 'blur(12px)',
-                            color: 'white',
+                            color: 'var(--text-primary)',
                             padding: '24px 32px',
                             borderRadius: '20px',
-                            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)',
+                            boxShadow: 'var(--shadow-lg)',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
@@ -531,7 +531,7 @@ const BeerPriceEditor = ({ beerName, searchFilter = '' }) => {
                             minWidth: '320px',
                             maxWidth: '400px',
                             textAlign: 'center',
-                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            border: '1px solid var(--accent-light)',
                             animation: 'fadeInPopup 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
                             position: 'relative'
                         }}>
@@ -543,7 +543,7 @@ const BeerPriceEditor = ({ beerName, searchFilter = '' }) => {
                                 right: '12px',
                                 background: 'none',
                                 border: 'none',
-                                color: '#ffffff',
+                                color: 'var(--text-primary)',
                                 opacity: 0.5,
                                 cursor: 'pointer',
                                 padding: '4px'
@@ -556,7 +556,8 @@ const BeerPriceEditor = ({ beerName, searchFilter = '' }) => {
                                 width: '40px', height: '40px', borderRadius: '50%',
                                 background: 'rgba(74, 222, 128, 0.2)', color: '#4ade80',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                marginBottom: '4px'
+                                marginBottom: '12px',
+                                margin: '0 auto'
                             }}>
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="20 6 9 17 4 12"></polyline>
@@ -567,24 +568,25 @@ const BeerPriceEditor = ({ beerName, searchFilter = '' }) => {
                                 <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{successPopup}</span>
                             ) : (
                                 <>
-                                    <h4 style={{ margin: 0, fontSize: '1rem', color: '#ccc' }}>
+                                    <h4 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 700 }}>
                                         Actualizado {successPopup.beerName} ({successPopup.subtype})
                                     </h4>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                                         {successPopup.changes.map((change, idx) => (
                                             <div key={idx} style={{
                                                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                                background: 'rgba(255,255,255,0.05)', padding: '8px 12px', borderRadius: '8px',
-                                                fontSize: '0.9rem'
+                                                background: 'var(--bg-card-hover)', padding: '10px 14px', borderRadius: '12px',
+                                                fontSize: '0.9rem',
+                                                border: '1px solid var(--accent-light)'
                                             }}>
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                                    <span style={{ fontWeight: 600 }}>{change.emission}</span>
-                                                    <span style={{ fontSize: '0.75rem', color: '#999' }}>{change.type}</span>
+                                                    <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '1rem' }}>{change.emission}</span>
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{change.type}</span>
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <span style={{ color: '#aaa', textDecoration: 'line-through' }}>{currencySymbol}{change.old}</span>
-                                                    <span style={{ color: '#aaa' }}>→</span>
-                                                    <span style={{ color: '#4ade80', fontWeight: 'bold' }}>{currencySymbol}{change.new}</span>
+                                                    <span style={{ color: 'var(--text-muted)', textDecoration: 'line-through' }}>{currencySymbol}{change.old}</span>
+                                                    <span style={{ color: 'var(--text-muted)' }}>→</span>
+                                                    <span style={{ color: '#34c759', fontWeight: 'bold' }}>{currencySymbol}{change.new}</span>
                                                 </div>
                                             </div>
                                         ))}
@@ -930,15 +932,20 @@ export default function SettingsPage() {
 
             {/* HISTORY MODAL */}
             {historyModalOpen && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000
-                }}>
-                    <div style={{
-                        background: 'var(--bg-card)', width: '90%', maxWidth: '400px',
-                        borderRadius: '20px', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
-                    }}>
+                <div
+                    onClick={() => setHistoryModalOpen(false)}
+                    style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000
+                    }}
+                >
+                    <div
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            background: 'var(--bg-card)', width: '90%', maxWidth: '400px',
+                            borderRadius: '20px', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+                        }}>
                         <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--accent-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Historial (7 Días)</h3>
                             <button onClick={() => setHistoryModalOpen(false)} style={{ color: 'var(--text-primary)' }}>&times;</button>
