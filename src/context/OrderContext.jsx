@@ -33,9 +33,15 @@ export const OrderProvider = ({ children }) => {
         localStorage.setItem('pendingOrders', JSON.stringify(pendingOrders));
     }, [pendingOrders]);
 
+    // DEV ONLY: Expose setter for DevTools
+    useEffect(() => {
+        window.__DEV_SET_ORDERS__ = setPendingOrders;
+        return () => { delete window.__DEV_SET_ORDERS__; };
+    }, []);
+
     // --- Actions ---
 
-    const createOrder = (customerName, items = [], type = 'Local', paymentMethod = null) => {
+    const createOrder = (customerName, items = [], type = 'Local', paymentMethod = null, reference = '') => {
         let initialItems = (items || []).map(item => ({
             ...item,
             addedAt: new Date().toISOString(),
@@ -64,6 +70,8 @@ export const OrderProvider = ({ children }) => {
             status: 'OPEN',
             type,
             paymentMethod, // Store the initial payment method
+            reference, // Store initial reference
+            createdBy: user?.user_metadata?.name || user?.email || 'Desconocido', // Track User
             createdAt: new Date().toISOString(),
             items: initialItems,
             payments: []

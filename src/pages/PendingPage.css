@@ -189,8 +189,10 @@
 }
 
 .close-ticket-btn:hover {
+    background: linear-gradient(135deg, #F97316 0%, #EA580C 100%);
     box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.4);
     transform: translateY(-1px);
+    opacity: 0.95;
 }
 
 /* Ticket Grid Styles */
@@ -439,4 +441,16 @@
     color: var(--text-muted);
     font-size: 0.8rem;
     text-align: center;
+}
+
+/* Merma Button Responsive Text */
+@media (max-width: 640px) {
+    .waste-btn-text {
+        display: none;
+    }
+
+    .waste-report-btn {
+        padding: 0 0.75rem !important;
+        /* Ensure square-ish shape */
+    }
 }

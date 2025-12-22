@@ -141,6 +141,19 @@ export const ProductProvider = ({ children }) => {
         fetchInitialData();
     }, [organizationId]);
 
+
+    // --- DEV ONLY: Expose setters for DevTools ---
+    useEffect(() => {
+        window.__DEV_SET_INVENTORY__ = setInventory;
+        window.__DEV_SET_INV_HISTORY__ = setInventoryHistory;
+        window.__DEV_SET_WASTE_HISTORY__ = setBreakageHistory;
+        return () => {
+            delete window.__DEV_SET_INVENTORY__;
+            delete window.__DEV_SET_INV_HISTORY__;
+            delete window.__DEV_SET_WASTE_HISTORY__;
+        };
+    }, []);
+
     // --- REALTIME ALIGNMENT ---
     // Removed because Mock Data is local only. Refreshes will reload data.
 

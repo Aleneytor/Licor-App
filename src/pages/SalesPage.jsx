@@ -198,7 +198,7 @@ export default function SalesPage() {
 
     const [paymentMethod, setPaymentMethod] = useState(null);
     const [paymentReference, setPaymentReference] = useState('');
-    const paymentMethods = ['Pago Movil', 'Efectivo', 'Punto', 'BioPago'];
+    const paymentMethods = ['Efectivo', 'Pago Móvil', 'Punto', 'Bio Pago'];
 
     const [showModal, setShowModal] = useState(false);
 
@@ -383,13 +383,14 @@ export default function SalesPage() {
 
             // STRICT PAYMENT VALIDATION FOR ALL ORDERS
             if (!paymentMethod) { alert("Selecciona método de pago para procesar la orden."); return; }
-            if (paymentMethod === 'Pago Movil' && !paymentReference.trim()) { alert("Ingresa referencia."); return; }
+            if (paymentMethod === 'Pago Móvil' && !paymentReference.trim()) { alert("Ingresa referencia."); return; }
         }
 
         const localItems = cartItems.filter(i => i.consumptionMode === 'Local');
 
         if (localItems.length > 0 || cartItems.length === 0) {
-            createOrder(customerName, localItems, 'Local', paymentMethod);
+            const finalMethod = `Pre-Pagado - ${paymentMethod}`;
+            createOrder(customerName, localItems, 'Local', finalMethod, paymentReference);
         }
 
         // Deduct Take Away & Normal Local
@@ -788,7 +789,7 @@ export default function SalesPage() {
                             ))}
                         </div>
 
-                        {paymentMethod === 'Pago Movil' && (
+                        {paymentMethod === 'Pago Móvil' && (
                             <div className="input-group-large">
                                 <Hash size={36} strokeWidth={2.5} className="input-icon-external" />
                                 <input type="text" placeholder="Referencia" className="ticket-input-large" value={paymentReference} onChange={(e) => { if (/^\d*$/.test(e.target.value)) setPaymentReference(e.target.value); }} inputMode="numeric" />

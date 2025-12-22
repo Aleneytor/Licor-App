@@ -268,7 +268,7 @@ const BeerDashboardCard = ({ beerName, searchFilter = '' }) => {
 };
 
 // --- Sub-component: BeerPriceEditor (Bulk Edit) ---
-const BeerPriceEditor = ({ beerName }) => {
+const BeerPriceEditor = ({ beerName, searchFilter = '' }) => {
     const {
         getEmissionsForSubtype,
         getPrice,
@@ -289,12 +289,33 @@ const BeerPriceEditor = ({ beerName }) => {
         }
     }, [successPopup]);
 
+    // Collapsible Logic
     const [subtype, setSubtype] = useState('Botella');
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    // Auto-expand if search matches
+    useEffect(() => {
+        if (searchFilter && searchFilter.length > 1) {
+            setIsExpanded(true);
+        } else {
+            setIsExpanded(false);
+        }
+    }, [searchFilter]);
+
     // Memoize calculating emissions to prevent infinite render loop
     const emissions = React.useMemo(() =>
         getEmissionsForSubtype(subtype),
         [getEmissionsForSubtype, subtype]
     );
+
+    // Filter emissions if searching
+    const filteredEmissions = emissions.filter(e => {
+        if (!searchFilter) return true;
+        // If the beer name itself matches deeply, show all emissions
+        if (isFuzzyMatch(beerName, searchFilter)) return true;
+        // Otherwise check if emission matches
+        return isFuzzyMatch(e, searchFilter);
+    });
 
     // Local state map: { 'Unidad': { standard: '', local: '' }, ... }
     const [priceMap, setPriceMap] = useState({});
@@ -311,7 +332,7 @@ const BeerPriceEditor = ({ beerName }) => {
             };
         });
         setPriceMap(initialMap);
-    }, [beerName, subtype, emissions, getPrice]); // Added getPrice for correctness
+    }, [beerName, subtype, emissions, getPrice]);
 
     const handleInputChange = (emission, type, value) => {
         setPriceMap(prev => ({
@@ -348,91 +369,135 @@ const BeerPriceEditor = ({ beerName }) => {
 
         if (changes.length > 0) {
             setSuccessPopup({ beerName, subtype, changes });
-            setTimeout(() => setSuccessPopup(null), 4000);
+        } else {
+            showNotification('No se detectaron cambios', 'info');
         }
     };
 
     return (
-        <div style={{ background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--accent-light)', padding: '1.25rem', marginTop: '1rem' }}>
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1.5rem',
-                flexWrap: 'wrap',
-                gap: '0.75rem'
-            }}>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, flex: '1 1 140px' }}>{beerName}</h3>
-                <div style={{ width: '100%', maxWidth: '200px', flex: '1 1 180px' }}>
+        <div style={{
+            background: 'var(--bg-card)',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            boxShadow: 'var(--shadow-sm)',
+            border: '1px solid var(--accent-light)',
+            position: 'relative'
+        }}>
+            {/* Header / Toggle Row */}
+            <div
+                onClick={() => setIsExpanded(!isExpanded)}
+                style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: isExpanded ? '1.5rem' : '0',
+                    cursor: 'pointer'
+                }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {isExpanded ? <ChevronUp size={20} color="var(--text-secondary)" /> : <ChevronDown size={20} color="var(--text-secondary)" />}
+                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>{beerName}</h3>
+                </div>
+
+                <div style={{ width: '200px' }} onClick={(e) => e.stopPropagation()}>
                     <ContainerSelector value={subtype} onChange={setSubtype} />
                 </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {emissions.map(emission => (
-                    <div key={emission} style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        paddingBottom: '1.25rem',
-                        borderBottom: '1px solid var(--accent-light)',
-                        gap: '0.75rem'
-                    }}>
-                        <span style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)' }}>{emission}</span>
+            {/* Collapsible Content */}
+            {isExpanded && (
+                <div style={{ animation: 'fadeIn 0.3s ease', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                    {filteredEmissions.length === 0 && (
+                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', padding: '1rem' }}>
+                            Sin resultados para "{searchFilter}"
+                        </div>
+                    )}
+
+                    {filteredEmissions.map(emission => (
+                        <div key={emission} style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            paddingBottom: '1.5rem',
+                            borderBottom: '1px solid var(--accent-light)',
                             gap: '0.75rem'
                         }}>
-                            {/* Standard (Para Llevar) */}
-                            <div style={{ background: 'var(--bg-card-hover)', padding: '0.75rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                                    <ShoppingBag size={14} color="var(--text-secondary)" />
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, opacity: 0.7 }}>PARA LLEVAR ({currencySymbol})</span>
-                                </div>
-                                <input
-                                    type="number"
-                                    placeholder="0.00"
-                                    className="price-input"
-                                    value={priceMap[emission]?.standard || ''}
-                                    onChange={(e) => handleInputChange(emission, 'standard', e.target.value)}
-                                    style={{
-                                        background: 'var(--bg-input)', border: '1px solid var(--accent-light)',
-                                        borderRadius: '8px', padding: '8px', width: '100%', fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--text-primary)'
-                                    }}
-                                />
-                            </div>
+                            <span style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)' }}>{emission}</span>
 
-                            {/* Local */}
-                            <div style={{ background: 'var(--bg-card-hover)', padding: '0.75rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                                    <Store size={14} color="var(--text-secondary)" />
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, opacity: 0.7 }}>LOCAL ({currencySymbol})</span>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                                gap: '0.75rem'
+                            }}>
+                                {/* Standard (Para Llevar) */}
+                                <div style={{ background: 'var(--bg-card-hover)', padding: '0.75rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                                        <ShoppingBag size={14} color="var(--text-secondary)" />
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, opacity: 0.7 }}>PARA LLEVAR ({currencySymbol})</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        placeholder="0.00"
+                                        className="price-input"
+                                        value={priceMap[emission]?.standard || ''}
+                                        onChange={(e) => handleInputChange(emission, 'standard', e.target.value)}
+                                        style={{
+                                            background: 'var(--bg-input)', border: '1px solid var(--accent-light)',
+                                            borderRadius: '8px', padding: '8px', width: '100%', fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--text-primary)'
+                                        }}
+                                    />
                                 </div>
-                                <input
-                                    type="number"
-                                    placeholder="0.00"
-                                    className="price-input"
-                                    value={priceMap[emission]?.local || ''}
-                                    onChange={(e) => handleInputChange(emission, 'local', e.target.value)}
-                                    style={{
-                                        background: 'var(--bg-input)', border: '1px solid var(--accent-light)',
-                                        borderRadius: '8px', padding: '8px', width: '100%', fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--text-primary)'
-                                    }}
-                                />
+
+                                {/* Local */}
+                                <div style={{ background: 'var(--bg-card-hover)', padding: '0.75rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                                        <Store size={14} color="var(--text-secondary)" />
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, opacity: 0.7 }}>LOCAL ({currencySymbol})</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        placeholder="0.00"
+                                        className="price-input"
+                                        value={priceMap[emission]?.local || ''}
+                                        onChange={(e) => handleInputChange(emission, 'local', e.target.value)}
+                                        style={{
+                                            background: 'var(--bg-input)', border: '1px solid var(--accent-light)',
+                                            borderRadius: '8px', padding: '8px', width: '100%', fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--text-primary)'
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
 
-            <button
-                className="create-ticket-btn"
-                onClick={handleSaveAll}
-                style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
-            >
-                <Save size={20} /> Guardar Cambios {beerName}
-            </button>
+                    <div style={{ marginTop: '1.5rem' }}>
+                        <button
+                            onClick={handleSaveAll}
+                            style={{
+                                width: '100%',
+                                background: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
+                                color: 'white',
+                                padding: '14px',
+                                borderRadius: '16px',
+                                border: 'none',
+                                fontWeight: 700,
+                                fontSize: '1rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '10px',
+                                cursor: 'pointer',
+                                boxShadow: '0 8px 20px rgba(249, 115, 22, 0.25)',
+                                transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+                            }}
+                        >
+                            <Save size={20} />
+                            Guardar Cambios
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <style jsx>{`
                 .order-summary-card > div > div:last-child { border-bottom: none !important; padding-bottom: 0 !important; }
                 @keyframes fadeInPopup { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
@@ -530,7 +595,7 @@ const BeerPriceEditor = ({ beerName }) => {
                     </div>
                 </div>
             )}
-        </div>
+        </div >
     );
 };
 
@@ -959,7 +1024,7 @@ export default function SettingsPage() {
                         })
                         .map(beer => (
                             isEditMode ? (
-                                <BeerPriceEditor key={beer} beerName={beer} />
+                                <BeerPriceEditor key={beer} beerName={beer} searchFilter={searchQuery} />
                             ) : (
                                 <BeerDashboardCard key={beer} beerName={beer} searchFilter={searchQuery} />
                             )

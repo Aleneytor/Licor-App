@@ -16,6 +16,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
 import NotificationToast from './components/NotificationToast';
+import DevTools from './components/DevTools';
 
 // Private Route Wrapper
 const PrivateRoute = () => {
@@ -36,6 +37,7 @@ function App() {
               <BrowserRouter>
                 <ScrollToTop />
                 <NotificationToast />
+                <DevTools />
                 <Routes>
                   {/* Public Routes - All routes are public now in Mock Mode */}
                   {/* <Route path="/login" element={<Login />} /> */}
