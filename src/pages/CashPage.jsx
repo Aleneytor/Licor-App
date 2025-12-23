@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useOrder } from '../context/OrderContext';
 import { useProduct } from '../context/ProductContext';
+import { useNotification } from '../context/NotificationContext';
 import {
     DollarSign, CheckCircle, Clock, Receipt, TrendingUp, Calendar, Download,
-    CreditCard, Smartphone, Banknote, AlertTriangle, Package, Activity, AlertCircle, ShoppingBag, ChevronDown, ChevronUp, User, Maximize2, X, ChevronLeft, ChevronRight
+    CreditCard, Smartphone, Banknote, AlertTriangle, Package, Activity, AlertCircle, ShoppingBag, ChevronDown, ChevronUp, User, Maximize2, X, ChevronLeft, ChevronRight, Share2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import './CashPage.css'; // Premium Styles
@@ -11,6 +12,7 @@ import './CashPage.css'; // Premium Styles
 export default function CashPage() {
     const { pendingOrders } = useOrder();
     const { getPrice, exchangeRates, inventory, beerTypes, subtypes, getUnitsPerEmission, currencySymbol } = useProduct();
+    const { showNotification } = useNotification();
     const [showReportModal, setShowReportModal] = useState(false);
     const [showWeeklyModal, setShowWeeklyModal] = useState(false);
     const [weekOffset, setWeekOffset] = useState(0);
@@ -292,11 +294,9 @@ export default function CashPage() {
         const summaryData = todaysSales.map(sale => {
             // 1. Detailed Consumption Logic
             const consumptionMap = {};
-            const uniqueBeers = new Set();
 
             sale.items.forEach(item => {
                 const name = item.beerType || item.name;
-                const subtype = item.subtype || 'Botella'; // Fallback
                 const emission = item.emission || 'Unidad';
                 const qty = item.quantity || 1;
 
@@ -304,24 +304,12 @@ export default function CashPage() {
                 const detailKey = `${name} - ${emission}`;
                 if (!consumptionMap[detailKey]) consumptionMap[detailKey] = 0;
                 consumptionMap[detailKey] += qty;
-
-                uniqueBeers.add(`${name}|${subtype}`);
             });
 
             const consumptionStr = Object.entries(consumptionMap)
                 .filter(([_, v]) => v > 0) // Filter out any 0s just in case
                 .map(([k, v]) => `${v} ${k}`)
                 .join(', ');
-
-            // 2. Inventory Logic (Current Snapshot)
-            // "Zulia: 45, Polar: 12"
-            const stockStr = Array.from(uniqueBeers).map(beerKey => {
-                const [name, subtype] = beerKey.split('|');
-                // Look up in global inventory
-                const invKey = `${name}_${subtype}`;
-                const qty = inventory[invKey] || 0;
-                return `${name} (${subtype}): ${qty}`;
-            }).join(', ');
 
             return {
                 'Ticket': sale.ticketNumber,
@@ -331,7 +319,7 @@ export default function CashPage() {
                 'Pago': displayPayment(sale.paymentMethod),
                 'Ref': (sale.paymentMethod && sale.paymentMethod.toString().toLowerCase().includes('pago móvil')) ? (sale.reference || '') : 'No Aplica', // Logic update
                 'Detalle Consumo': consumptionStr,
-                'Inventario Disponible': stockStr,
+                'Usuario': sale.createdBy || 'Desconocido',
                 [`Total (${currencySymbol})`]: parseFloat(sale.total.toFixed(2)),
                 'Total (Bs)': parseFloat((sale.total * rate).toFixed(2)),
             };
@@ -342,6 +330,62 @@ export default function CashPage() {
         XLSX.utils.book_append_sheet(wb, ws, "Reporte_Diario");
         const dateStr = new Date().toLocaleDateString().replace(/\//g, '-');
         XLSX.writeFile(wb, `Caja_${dateStr}.xlsx`);
+    };
+
+    const handleShareSale = (sale) => {
+        const rate = exchangeRates.bcv || 0;
+        const dateStr = new Date(sale.closedAt).toLocaleDateString();
+        const timeStr = new Date(sale.closedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const itemsStr = sale.items.map(item => {
+            const qty = item.quantity || 1;
+            const name = item.beerType || item.name;
+            const emission = item.emission || 'Unidad';
+            return `• ${qty} ${name} (${emission})`;
+        }).join('\n');
+
+        const message = `*Reporte de Pago - Licorería*\n\n` +
+            `*Cliente:* ${sale.customerName}\n` +
+            `*Ticket:* #${sale.ticketNumber}\n` +
+            `*Fecha:* ${dateStr} ${timeStr}\n` +
+            `*Pago:* ${displayPayment(sale.paymentMethod)}\n\n` +
+            `*Consumo:*\n${itemsStr}\n\n` +
+            `*Total:* $${sale.total.toFixed(2)}\n` +
+            `*Total Bs:* ${(sale.total * rate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n` +
+            `¡Gracias por su preferencia!`;
+
+        const copyToClipboard = (text) => {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(text);
+            } else {
+                // Fallback for older browsers or insecure contexts
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    return Promise.resolve();
+                } catch (err) {
+                    document.body.removeChild(textArea);
+                    return Promise.reject(err);
+                }
+            }
+        };
+
+        copyToClipboard(message)
+            .then(() => {
+                showNotification('Reporte Copiado Exitosamente', 'success', 1200);
+            })
+            .catch(err => {
+                console.error('Error copying to clipboard:', err);
+                showNotification('Error al copiar el reporte', 'error', 2000);
+            });
     };
 
     const rate = exchangeRates.bcv || 0;
@@ -704,7 +748,6 @@ export default function CashPage() {
                         <div className="report-modal-header">
                             <div>
                                 <h3 className="text-xl font-bold text-primary">Reportes Detallados</h3>
-                                <p className="text-sm text-secondary">{new Date().toLocaleDateString()}</p>
                             </div>
                             <button className="close-btn" onClick={() => setShowReportModal(false)}>
                                 <X size={24} />
@@ -728,8 +771,28 @@ export default function CashPage() {
                                                     {new Date(sale.closedAt).toLocaleDateString()} • {new Date(sale.closedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • #{sale.ticketNumber}
                                                 </div>
                                             </div>
-                                            <div className="payment-badge-pill" style={{ background: `${methodColor}15`, color: methodColor }}>
-                                                {displayPayment(method)}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <div className="payment-badge-pill" style={{ background: `${methodColor}15`, color: methodColor }}>
+                                                    {displayPayment(method)}
+                                                </div>
+                                                <button
+                                                    className="share-report-btn"
+                                                    onClick={() => handleShareSale(sale)}
+                                                    style={{
+                                                        background: 'var(--card-bg)',
+                                                        border: '1px solid var(--border-color)',
+                                                        borderRadius: '8px',
+                                                        padding: '6px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        color: 'var(--text-secondary)',
+                                                        transition: 'all 0.2s',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    <Share2 size={16} />
+                                                </button>
                                             </div>
                                         </div>
 

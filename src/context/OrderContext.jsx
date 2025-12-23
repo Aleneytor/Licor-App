@@ -408,6 +408,46 @@ export const OrderProvider = ({ children }) => {
         showNotification(`Ticket Cerrado: ${formattedTotal} Bs`, 'success');
     };
 
+    const processDirectSale = async (customerName, items, paymentMethod, reference) => {
+        // 1. Calculate totals (using the helper)
+        const { totalBs, totalUsd, optimizedItems } = calculateOrderTotal(items, 'Para Llevar');
+
+        // 2. Create the PAID order object
+        const newOrder = {
+            id: Date.now().toString(),
+            ticketNumber: Math.floor(1000 + Math.random() * 9000),
+            customerName: customerName || 'Venta Directa',
+            status: 'PAID',
+            type: 'Llevar',
+            paymentMethod,
+            reference,
+            createdBy: user?.user_metadata?.name || user?.email || 'Desconocido',
+            createdAt: new Date().toISOString(),
+            closedAt: new Date().toISOString(),
+            items: optimizedItems,
+            totalAmountBs: totalBs,
+            totalAmountUsd: totalUsd,
+            payments: []
+        };
+
+        // 3. Centralized Stock Deduction
+        for (const item of items) {
+            const beerName = item.beerType || item.name;
+            if (item.beerVariety === 'Variado' && item.composition) {
+                for (const [beer, units] of Object.entries(item.composition)) {
+                    await deductStock(beer, 'Unidad', item.subtype, units * (item.quantity || 1));
+                }
+            } else {
+                await deductStock(beerName, item.emission, item.subtype, item.quantity || 1);
+            }
+        }
+
+        // 4. Save to State
+        setPendingOrders(prev => [newOrder, ...prev]);
+        showNotification(`Venta Registrada en Caja`, 'success');
+        return newOrder;
+    };
+
     const updateOrderItemSlot = async (orderId, itemIndex, slotIndex, content) => {
         const order = pendingOrders.find(o => o.id === orderId);
         if (!order) return;
@@ -464,6 +504,7 @@ export const OrderProvider = ({ children }) => {
             removeItemFromOrder,
             closeOrder,
             cancelOrder,
+            processDirectSale,
             updateOrderItemSlot,
             calculateOrderTotal // Exposed
         }}>

@@ -23,6 +23,9 @@ export const generateFakeData = () => {
     const sales = [];
     const now = new Date();
 
+    const directSaleThreshold = Math.random(); // Random probability for this specific run
+    console.log(`Direct sale probability for this run: ${(1 - directSaleThreshold).toFixed(2)}`);
+
     for (let i = 0; i < 400; i++) {
         // Purely random spread over last 45 days
         const daysBack = randomInt(0, 45);
@@ -32,6 +35,9 @@ export const generateFakeData = () => {
         const itemsCount = randomInt(1, 4);
         const items = [];
         let total = 0;
+
+        const isDirectSale = Math.random() > directSaleThreshold;
+        const saleType = isDirectSale ? 'Llevar' : 'Local';
 
         for (let j = 0; j < itemsCount; j++) {
             const beer = randomItem(BEERS);
@@ -51,6 +57,7 @@ export const generateFakeData = () => {
             items.push({
                 id: `fake-item-${i}-${j}`,
                 name: beer,
+                beerType: beer, // Compatibility
                 emission: emission,
                 subtype: subtype,
                 quantity: quantity,
@@ -64,9 +71,9 @@ export const generateFakeData = () => {
         sales.push({
             id: `fake-sale-${i}`,
             ticketNumber: 1000 + i,
-            customerName: randomItem(CUSTOMERS),
+            customerName: isDirectSale && Math.random() > 0.3 ? 'Venta Directa' : randomItem(CUSTOMERS),
             status: 'PAID',
-            type: Math.random() > 0.5 ? 'Local' : 'Para Llevar',
+            type: saleType,
             paymentMethod: randomItem(PAYMENT_METHODS),
             reference: 'REF' + randomInt(10000, 99999),
             createdBy: randomItem(USERS),

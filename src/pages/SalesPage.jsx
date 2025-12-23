@@ -14,7 +14,7 @@ export default function SalesPage() {
         deductStock, checkStock, getUnitsPerEmission, checkAggregateStock,
         getInventory, getEmissionsForSubtype, currencySymbol
     } = useProduct();
-    const { createOrder } = useOrder();
+    const { createOrder, processDirectSale } = useOrder();
 
     const [openSection, setOpenSection] = useState('consumption');
     const [showResetModal, setShowResetModal] = useState(false);
@@ -378,6 +378,8 @@ export default function SalesPage() {
 
     const handleFinalConfirm = () => {
         const hasLocal = cartItems.some(i => i.consumptionMode === 'Local');
+        const hasTakeAway = cartItems.some(i => i.consumptionMode === 'Para Llevar');
+
         if (ticketStep === 2) {
             if (hasLocal && !customerName.trim()) { alert("Ingresa nombre del cliente."); return; }
 
@@ -387,39 +389,30 @@ export default function SalesPage() {
         }
 
         const localItems = cartItems.filter(i => i.consumptionMode === 'Local');
+        const takeawayItems = cartItems.filter(i => i.consumptionMode === 'Para Llevar');
 
-        if (localItems.length > 0 || cartItems.length === 0) {
+        // 1. Process Local Items (Ticket Open)
+        // Note: cartItems.length === 0 handles "Carta Abierta"
+        if (localItems.length > 0 || (cartItems.length === 0 && !hasTakeAway)) {
             const finalMethod = `Pre-Pagado - ${paymentMethod}`;
             createOrder(customerName, localItems, 'Local', finalMethod, paymentReference);
-        }
 
-        // Deduct Take Away & Normal Local
-        cartItems.forEach(item => {
-            if (item.consumptionMode === 'Para Llevar') {
-                if (item.beerVariety === 'Variado' && item.composition) {
-                    Object.entries(item.composition).forEach(([beer, units]) => {
-                        deductStock(beer, 'Unidad', item.subtype, units * item.quantity);
-                    });
-                } else {
-                    deductStock(item.beerType, item.emission, item.subtype, item.quantity);
-                }
-            } else if (item.consumptionMode === 'Local') {
-                // For Local Orders:
-                // 1. Normal (Media Caja, Caja): Do NOT deduct stock. Slots start empty (0/N).
-                // 2. Variado: Deduct 1 unit (Base Beer) as it starts with 1 slot filled.
-
+            // Deduct stock for Variado in Local mode (Special initial unit)
+            localItems.forEach(item => {
                 if (item.beerVariety === 'Variado') {
-                    // Deduct 1 unit of the base beer
-                    // Note: item.beerType might be 'Variado (Base)', use item.baseBeer if available
                     const beerToDeduct = item.baseBeer || item.beerType;
-                    // Clean up name if needed (remove 'Variado (...)')? 
-                    // Actually SalesConfig sets baseBeer correctly.
                     deductStock(beerToDeduct, 'Unidad', item.subtype, 1);
                 }
-            }
-        });
+            });
+        }
 
-        if (localItems.length > 0 && !cartItems.some(i => i.consumptionMode === 'Para Llevar')) {
+        // 2. Process Take Away Items (Directly to Cash/PAID)
+        if (takeawayItems.length > 0) {
+            processDirectSale(customerName, takeawayItems, paymentMethod, paymentReference);
+        }
+
+        // 3. Navigation / Feedback
+        if (localItems.length > 0 && !hasTakeAway) {
             navigateToPending();
         } else {
             setShowModal(true);
