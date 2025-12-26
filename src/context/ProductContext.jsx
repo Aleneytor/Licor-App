@@ -659,9 +659,14 @@ export const ProductProvider = ({ children }) => {
     };
 
     // --- EXCHANGE RATES ---
-    const [exchangeRates, setExchangeRates] = useState(() =>
-        loadFromStorage('exchangeRates', { bcv: 0, custom: 0, euro: 0, history: [], lastUpdate: null })
-    );
+    const [exchangeRates, setExchangeRates] = useState(() => {
+        const stored = loadFromStorage('exchangeRates', { bcv: 0, custom: 0, euro: 0, history: [], lastUpdate: null });
+        // Sanitize NaN from storage
+        if (stored && isNaN(stored.custom)) {
+            stored.custom = 0;
+        }
+        return stored;
+    });
 
     const updateCustomRate = (value) => {
         const rawValue = value.toString().replace(/,/g, '');

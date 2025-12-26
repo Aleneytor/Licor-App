@@ -815,7 +815,7 @@ export function CashPageContent() {
                                 <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', opacity: 0.9 }}>
                                     <span>Margen: {profitStats.weekMargin.toFixed(1)}%</span>
                                     <span>•</span>
-                                    <span>Bs {(profitStats.weekNet * (exchangeRates.bcv || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span>Bs {(profitStats.weekNet * (currentRate || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
 

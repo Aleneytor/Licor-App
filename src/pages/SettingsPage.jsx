@@ -91,6 +91,7 @@ const BeerDashboardCard = ({ beerName, searchFilter = '' }) => {
         getPrice,
         getInventory,
         exchangeRates = {},
+        currentRate,
         prices
     } = useProduct();
 
@@ -147,7 +148,7 @@ const BeerDashboardCard = ({ beerName, searchFilter = '' }) => {
     });
 
     const formatBs = (usd) => {
-        const rate = exchangeRates.bcv || 0;
+        const rate = currentRate || 0;
         return (usd * rate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Bs';
     };
 
@@ -1053,7 +1054,8 @@ export default function SettingsPage() {
                                             value={draftCustomRate}
                                             onChange={(e) => {
                                                 const rawValue = e.target.value.replace(/,/g, '');
-                                                if (/^\d*\.?\d*$/.test(rawValue)) {
+                                                // Permitir vacío, números con punto, o incluso si empezó como NaN permitir borrarlo
+                                                if (rawValue === '' || /^\d*\.?\d*$/.test(rawValue)) {
                                                     setDraftCustomRate(rawValue);
                                                 }
                                             }}
@@ -1081,7 +1083,7 @@ export default function SettingsPage() {
                                         />
                                     ) : (
                                         <span style={{ fontSize: '1.75rem', fontWeight: 800 }}>
-                                            {exchangeRates.custom === 0 ? '0.00' : Number(exchangeRates.custom).toLocaleString('en-US')}
+                                            {(!exchangeRates.custom || isNaN(exchangeRates.custom)) ? '0.00' : Number(exchangeRates.custom).toLocaleString('en-US')}
                                         </span>
                                     )}
                                     <span>Bs</span>
@@ -1093,7 +1095,8 @@ export default function SettingsPage() {
                                             updateCustomRate(draftCustomRate);
                                             setIsEditingCustomRate(false);
                                         } else {
-                                            setDraftCustomRate(exchangeRates.custom === 0 ? '' : exchangeRates.custom.toString());
+                                            const currentVal = exchangeRates.custom;
+                                            setDraftCustomRate((!currentVal || isNaN(currentVal)) ? '' : currentVal.toString());
                                             setIsEditingCustomRate(true);
                                         }
                                     }}
