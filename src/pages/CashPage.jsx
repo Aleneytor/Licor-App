@@ -185,77 +185,54 @@ export function CashPageContent() {
             topProducts: sortedProducts,
             lowStockConnect: alerts.slice(0, 5),
             weeklyStats: (() => {
-                const now = new Date();
-                const day = now.getDay(); // 0 (Sun) - 6 (Sat)
-                const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-                const monday = new Date(now.setDate(diff));
-                monday.setHours(0, 0, 0, 0);
-
-                const weekData = Array(7).fill(0);
                 const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-
-                (pendingOrders || []).forEach(o => {
-                    if (o?.status === 'PAID') {
-                        const d = new Date(o.closedAt || o.createdAt);
-                        if (d >= monday) {
-                            let dIndex = d.getDay();
-                            let chartIndex = dIndex === 0 ? 6 : dIndex - 1;
-
-                            const total = (o.totalAmountUsd !== undefined && o.totalAmountUsd !== null)
-                                ? Number(o.totalAmountUsd)
-                                : getOrderTotal(o.items || []);
-
-                            if (chartIndex >= 0 && chartIndex < 7) {
-                                weekData[chartIndex] += total;
-                            }
-                        }
-                    }
-                });
-
-                const maxVal = Math.max(...weekData, 1); // Avoid div by 0
                 const currentDayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
 
-                return {
-                    data: weekData,
-                    total: weekData.reduce((a, b) => a + b, 0),
-                    labels: days,
-                    maxVal,
-                    currentDayIndex,
-                    getWeekData: (offset) => {
-                        const targetMonday = new Date();
-                        const targetDayNum = targetMonday.getDay() || 7;
-                        targetMonday.setDate(targetMonday.getDate() - (targetDayNum - 1) - (offset * 7));
-                        targetMonday.setHours(0, 0, 0, 0);
+                const getWeekData = (offset) => {
+                    const targetMonday = new Date();
+                    const targetDayNum = targetMonday.getDay() || 7;
+                    targetMonday.setDate(targetMonday.getDate() - (targetDayNum - 1) - (offset * 7));
+                    targetMonday.setHours(0, 0, 0, 0);
 
-                        const weekTotalData = Array(7).fill(0);
-                        const mondayTime = targetMonday.getTime();
-                        const sundayTime = mondayTime + (7 * 24 * 60 * 60 * 1000);
+                    const weekTotalData = Array(7).fill(0);
+                    const mondayTime = targetMonday.getTime();
+                    const sundayTime = mondayTime + (7 * 24 * 60 * 60 * 1000);
 
-                        (pendingOrders || []).forEach(o => {
-                            if (o?.status === 'PAID') {
-                                const d = new Date(o.closedAt || o.createdAt);
-                                const t = d.getTime();
-                                if (t >= mondayTime && t < sundayTime) {
-                                    const dIdx = d.getDay();
-                                    const cIdx = dIdx === 0 ? 6 : dIdx - 1;
-                                    const val = (o.totalAmountUsd !== undefined && o.totalAmountUsd !== null)
-                                        ? Number(o.totalAmountUsd)
-                                        : getOrderTotal(o.items || []);
-                                    if (weekTotalData[cIdx] !== undefined) {
-                                        weekTotalData[cIdx] += val;
-                                    }
+                    (pendingOrders || []).forEach(o => {
+                        if (o?.status === 'PAID') {
+                            const d = new Date(o.closedAt || o.createdAt);
+                            const t = d.getTime();
+                            if (t >= mondayTime && t < sundayTime) {
+                                const dIdx = d.getDay();
+                                const cIdx = dIdx === 0 ? 6 : dIdx - 1;
+                                const val = (o.totalAmountUsd !== undefined && o.totalAmountUsd !== null)
+                                    ? Number(o.totalAmountUsd)
+                                    : getOrderTotal(o.items || []);
+                                if (weekTotalData[cIdx] !== undefined) {
+                                    weekTotalData[cIdx] += val;
                                 }
                             }
-                        });
+                        }
+                    });
 
-                        return {
-                            data: weekTotalData,
-                            total: weekTotalData.reduce((a, b) => a + b, 0),
-                            max: Math.max(...weekTotalData, 0),
-                            start: targetMonday,
-                            end: new Date(mondayTime + (6 * 24 * 60 * 60 * 1000))
-                        };
-                    },
+                    return {
+                        data: weekTotalData,
+                        total: weekTotalData.reduce((a, b) => a + b, 0),
+                        max: Math.max(...weekTotalData, 0),
+                        start: targetMonday,
+                        end: new Date(mondayTime + (6 * 24 * 60 * 60 * 1000))
+                    };
+                };
+
+                const currentWeek = getWeekData(0);
+
+                return {
+                    data: currentWeek.data,
+                    total: currentWeek.total,
+                    labels: days,
+                    maxVal: currentWeek.max || 1,
+                    currentDayIndex,
+                    getWeekData,
                     historicalWeeks: (() => {
                         // Calculate last 4 weeks totals
                         const weeks = {}; // key: timestamp
@@ -416,6 +393,8 @@ export function CashPageContent() {
     // --- REUSABLE CHART COMPONENT ---
     const WeeklyChart = ({ onClick }) => {
         const compactLabels = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+        const nonZeroValues = weeklyStats.data.filter(v => v > 0);
+        const effectiveMax = nonZeroValues.length > 0 ? Math.max(...nonZeroValues) : 1;
 
         return (
             <div
@@ -424,25 +403,33 @@ export function CashPageContent() {
                 onClick={onClick}
             >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                    <h3 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Semana Actual</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F97316', boxShadow: '0 0 8px rgba(249, 115, 22, 0.6)' }} />
+                        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>Desempeño Semanal</h3>
+                    </div>
                     <Calendar size={16} className="text-secondary" />
                 </div>
 
                 <div className="chart-container">
                     {weeklyStats.data.map((val, idx) => {
-                        // Calculate max from non-zero values only
-                        const nonZeroValues = weeklyStats.data.filter(v => v > 0);
-                        const effectiveMax = nonZeroValues.length > 0 ? Math.max(...nonZeroValues) : 1;
                         const height = (val / effectiveMax) * 100; // % height
                         const isActive = idx === weeklyStats.currentDayIndex;
                         return (
                             <div key={idx} className="chart-bar-wrapper">
                                 <div
                                     className={`chart-bar ${isActive ? 'bar-active' : ''}`}
-                                    style={{ height: `${Math.max(height, 8)}%`, opacity: (val === 0 && !isActive) ? 0.2 : 1 }}
-                                    data-value={`$${val.toFixed(0)}`}
+                                    style={{
+                                        height: `${Math.max(height, 6)}%`,
+                                        opacity: (val === 0 && !isActive) ? 0.3 : 1,
+                                        animation: isActive ? 'pulse-orange 2s infinite' : 'none'
+                                    }}
+                                    data-value={`${currencySymbol}${val.toFixed(0)}`}
                                 />
-                                <span className="bar-label" style={{ fontWeight: isActive ? '800' : '600' }}>
+                                <span className="bar-label" style={{
+                                    fontWeight: isActive ? '800' : '600',
+                                    color: isActive ? 'var(--accent-color)' : 'var(--text-secondary)',
+                                    marginTop: '4px'
+                                }}>
                                     {compactLabels[idx]}
                                 </span>
                             </div>

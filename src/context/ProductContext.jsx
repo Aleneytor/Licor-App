@@ -7,7 +7,8 @@ import {
     fetchProducts, createProduct, updateProduct,
     fetchInventory, upsertInventory,
     fetchPrices, upsertPrice,
-    fetchSettings, fetchEmissions, fetchSales, upsertEmission
+    fetchSettings, fetchEmissions, fetchSales, upsertEmission,
+    deleteProduct, deleteEmission
 } from '../services/api';
 
 const ProductContext = createContext();
@@ -274,11 +275,19 @@ export const ProductProvider = ({ children }) => {
     };
 
     const removeBeerType = async (name) => {
-        // Not fully implemented in Mock API yet but UI expects it
         const productId = productMap[name];
         if (!productId) return;
+
+        // Optimistic UI update
         setBeerTypes(prev => prev.filter(b => b !== name));
-        // await deleteProduct(productId); // Mock delete not impl
+
+        // Delete from DB
+        try {
+            await deleteProduct(productId);
+        } catch (error) {
+            console.error("Error deleting product from DB:", error);
+            // Optional: Revert state if critical, but for now we log
+        }
     };
 
     const getBeerColor = (beerName) => {
@@ -340,6 +349,9 @@ export const ProductProvider = ({ children }) => {
             return;
         }
         try {
+            // Find the item to delete (need its ID for DB deletion)
+            const itemToDelete = rawEmissions.find(e => e.name === name && (e.subtype === subtype || (!e.subtype && !subtype)));
+
             // Remove specific emission for this subtype OR legacy global with same name
             const updated = rawEmissions.filter(e => !(e.name === name && (e.subtype === subtype || !e.subtype)));
             setRawEmissions(updated);
@@ -351,8 +363,16 @@ export const ProductProvider = ({ children }) => {
             }
 
             localStorage.setItem('mock_emissions', JSON.stringify(updated));
+
+            // Delete from DB
+            if (itemToDelete && itemToDelete.id) {
+                // Check if it's a temp ID (timestamp) or UUID. Usually UUID from Supabase.
+                // Even if "mock" ID (Date.now()), we shouldn't error but it won't be in DB.
+                await deleteEmission(itemToDelete.id);
+            }
         } catch (error) {
             console.error("Error removing emission:", error);
+            showNotification('Error eliminando emisión', 'error');
         }
     };
 
@@ -368,7 +388,7 @@ export const ProductProvider = ({ children }) => {
 
         const custom = (rawEmissions || [])
             .filter(e => {
-                const belongsToSubtype = e.subtype === subtype || !e.subtype;
+                const belongsToSubtype = e.subtype === subtype; // Strict match
                 const isSixPack = e.name && e.name.toLowerCase().trim() === 'six pack';
                 return belongsToSubtype && !isSixPack;
             })
@@ -376,13 +396,24 @@ export const ProductProvider = ({ children }) => {
 
         const merged = Array.from(new Set([...globals, ...custom]));
 
-        // Final sanity check: remove "Six Pack" if it's NOT a lata
-        if (!isLata) {
-            return merged.filter(n => n.toLowerCase().trim() !== 'six pack');
-        }
+        // FIX: Filter out emissions that are actually Beer Types (user error protection)
+        // But preserve reserved system emissions
+        const reservedKeywords = ['Unidad', 'Caja', 'Media Caja', 'Six Pack', 'Pack', 'Bulto'];
 
-        return merged;
-    }, [rawEmissions]);
+        return merged.filter(name => {
+            // Always allow reserved keywords
+            if (reservedKeywords.some(k => k.toLowerCase() === name.toLowerCase())) return true;
+
+            // Remove "Six Pack" if not lata
+            if (!isLata && name.toLowerCase().trim() === 'six pack') return false;
+
+            // Filter out if it matches a Beer Type
+            const isBeer = beerTypes.some(b => b.toLowerCase() === name.toLowerCase());
+            if (isBeer) return false;
+
+            return true;
+        });
+    }, [rawEmissions, beerTypes]);
 
     // --- COST & NET PROFIT MANAGEMENT ---
     const [costPrices, setCostPrices] = useState({});

@@ -816,6 +816,7 @@ export default function SettingsPage() {
     // Form inputs state
     const [newBeerName, setNewBeerName] = useState('');
     const [newBeerColor, setNewBeerColor] = useState('#3b82f6');
+    const [newBeerSubtype, setNewBeerSubtype] = useState('Botella'); // 'Botella' | 'Lata'
 
     // --- NUEVO: Estado para Nombre y Unidades de la Emisión ---
     const [newEmissionName, setNewEmissionName] = useState('');
@@ -846,6 +847,11 @@ export default function SettingsPage() {
         if (!newBeerName.trim()) return;
         try {
             await addBeerType(newBeerName.trim(), newBeerColor);
+
+            // Initialize with a 0 price for the standard 'Unidad' emission 
+            // of the chosen format so it shows up in dashboard/inventory right away
+            await updatePrice(newBeerName.trim(), 'Unidad', newBeerSubtype, 0, false);
+
             setNewBeerName('');
             setNewBeerColor('#3b82f6');
             showNotification('Producto agregado exitosamente', 'success');
@@ -891,12 +897,12 @@ export default function SettingsPage() {
     const MainMenu = () => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
             {[
-                { id: 'products', label: 'Gestion de Productos', icon: Package },
-                { id: 'dashboard', label: 'Precios Actuales', icon: Star },
-                { id: 'inventory', label: 'Inventario', icon: Box },
-                { id: 'bcv', label: 'Tasas', icon: CircleDollarSign },
-                { id: 'users', label: 'Usuarios', icon: Users },
-                { id: 'app', label: 'Apariencia', icon: Sun },
+                { id: 'products', label: 'Gestion de Productos', icon: Package, color: '#4ade80' },
+                { id: 'dashboard', label: 'Precios Actuales', icon: Star, color: '#3b82f6' },
+                { id: 'inventory', label: 'Inventario', icon: Box, color: '#a3e635' },
+                { id: 'bcv', label: 'Tasas', icon: CircleDollarSign, color: '#f97316' },
+                { id: 'users', label: 'Usuarios', icon: Users, color: '#ef4444' },
+                { id: 'app', label: 'Apariencia', icon: Sun, color: '#6366f1' },
             ].map(item => (
                 <button
                     key={item.id}
@@ -905,8 +911,8 @@ export default function SettingsPage() {
                     style={{ height: 'auto', padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '16px', background: 'var(--bg-card)', border: 'none' }}
                 >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div style={{ background: 'var(--bg-app)', width: '36px', height: '36px', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', flexShrink: 0 }}>
-                            <item.icon size={20} color="var(--text-secondary)" />
+                        <div style={{ background: item.color, width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '12px', flexShrink: 0, boxShadow: `0 4px 12px ${item.color}40` }}>
+                            <item.icon size={20} color="white" />
                         </div>
                         <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-primary)' }}>{item.label}</span>
                     </div>
@@ -1386,35 +1392,120 @@ export default function SettingsPage() {
                 currentView === 'products' && (
                     <>
                         <AccordionSection title="Tipos de Cerveza" isOpen={!!openSections['beers']} onToggle={() => toggleSettingSection('beers')}>
-                            <div style={{ position: 'relative', marginBottom: '1rem' }}>
-                                <div className="input-group-large" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                                    <button onClick={(e) => { const rect = e.target.getBoundingClientRect(); setPickerPos({ top: rect.bottom + 10, left: rect.left }); setShowColorPicker(!showColorPicker); }} style={{ width: '24px', height: '24px', borderRadius: '50%', background: newBeerColor, border: '2px solid #ddd', cursor: 'pointer', flexShrink: 0 }} />
-                                    <input type="text" placeholder="Nueva Cerveza" className="ticket-input-large" value={newBeerName} onChange={(e) => setNewBeerName(e.target.value)} style={{ flex: 1 }} />
-                                    <button onClick={handleAddBeer} className="option-btn selected" style={{ padding: '1rem', height: 'auto', borderRadius: '50%' }}><Plus size={24} /></button>
+                            <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-card-hover)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--accent-light)' }}>
+                                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                        <button
+                                            onClick={(e) => {
+                                                const rect = e.target.getBoundingClientRect();
+                                                setPickerPos({ top: rect.bottom + 10, left: rect.left });
+                                                setShowColorPicker(!showColorPicker);
+                                            }}
+                                            style={{ width: '32px', height: '32px', borderRadius: '50%', background: newBeerColor, border: '2px solid rgba(0,0,0,0.1)', cursor: 'pointer', flexShrink: 0 }}
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Ej: Polar Pilsen, Solera..."
+                                            className="ticket-input-large"
+                                            value={newBeerName}
+                                            onChange={(e) => setNewBeerName(e.target.value)}
+                                            style={{ flex: 1, padding: '0.75rem 1.25rem', fontSize: '1rem', height: '48px' }}
+                                        />
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'space-between' }}>
+                                        <div style={{ flex: 1, maxWidth: '200px' }}>
+                                            <div style={{
+                                                position: 'relative',
+                                                display: 'flex',
+                                                background: 'var(--bg-app)',
+                                                borderRadius: '999px',
+                                                padding: '2px',
+                                                height: '36px',
+                                                isolation: 'isolate'
+                                            }}>
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    top: '2px', bottom: '2px', left: '2px',
+                                                    width: 'calc(50% - 2px)',
+                                                    background: 'var(--text-primary)',
+                                                    borderRadius: '999px',
+                                                    transform: newBeerSubtype === 'Lata' ? 'translateX(100%)' : 'translateX(0)',
+                                                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                    zIndex: 1
+                                                }} />
+                                                <button
+                                                    onClick={() => setNewBeerSubtype('Botella')}
+                                                    style={{ flex: 1, border: 'none', background: 'transparent', color: newBeerSubtype === 'Botella' ? 'var(--bg-card)' : 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem', zIndex: 2, cursor: 'pointer' }}
+                                                >
+                                                    Botella
+                                                </button>
+                                                <button
+                                                    onClick={() => setNewBeerSubtype('Lata')}
+                                                    style={{ flex: 1, border: 'none', background: 'transparent', color: newBeerSubtype === 'Lata' ? 'var(--bg-card)' : 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem', zIndex: 2, cursor: 'pointer' }}
+                                                >
+                                                    Lata
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={handleAddBeer}
+                                            className="option-btn selected"
+                                            style={{
+                                                padding: '0 1.5rem',
+                                                height: '40px',
+                                                borderRadius: '12px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                fontSize: '0.9rem'
+                                            }}
+                                        >
+                                            <Plus size={18} />
+                                            <span>Agregar</span>
+                                        </button>
+                                    </div>
                                 </div>
+
                                 {showColorPicker && (
-                                    <div style={{ position: 'fixed', top: pickerPos.top, left: pickerPos.left, zIndex: 1000, background: 'white', padding: '1rem', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', width: '280px' }}>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px' }}>
+                                    <div style={{ position: 'fixed', top: pickerPos.top, left: pickerPos.left, zIndex: 1000, background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '20px', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--accent-light)', width: '280px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px' }}>
                                             {presetColors.map(color => (
-                                                <button key={color} onClick={() => { setNewBeerColor(color); setShowColorPicker(false); }} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: color, border: newBeerColor === color ? '3px solid #000' : '2px solid transparent' }} />
+                                                <button key={color} onClick={() => { setNewBeerColor(color); setShowColorPicker(false); }} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: color, border: newBeerColor === color ? '3px solid var(--text-primary)' : '2px solid transparent' }} />
                                             ))}
                                         </div>
                                     </div>
                                 )}
                             </div>
                             <div className="options-grid" style={{ gridTemplateColumns: '1fr', gap: '0.5rem' }}>
-                                {Array.isArray(beerTypes) && beerTypes.map(beer => {
-                                    const color = getBeerColor(beer);
-                                    return (
-                                        <div key={beer} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--bg-card-hover)', borderRadius: '12px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: color.raw || color.bg }}></div>
-                                                <span style={{ fontWeight: 500 }}>{beer}</span>
+                                {Array.isArray(beerTypes) && beerTypes
+                                    .filter(beer => {
+                                        const category = newBeerSubtype.toLowerCase();
+                                        const relatedKeys = Object.keys(prices).filter(key => key.startsWith(beer + '_'));
+
+                                        // If product has no prices yet, show it so it can be configured
+                                        if (relatedKeys.length === 0) return true;
+
+                                        // Otherwise, only show if it has prices for the current format (Botella or Lata)
+                                        return relatedKeys.some(key => {
+                                            const parts = key.split('_');
+                                            const pSubtype = (parts[2] || '').toLowerCase();
+                                            return pSubtype.includes(category);
+                                        });
+                                    })
+                                    .map(beer => {
+                                        const color = getBeerColor(beer);
+                                        return (
+                                            <div key={beer} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--bg-card-hover)', borderRadius: '12px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: color.raw || color.bg }}></div>
+                                                    <span style={{ fontWeight: 500 }}>{beer}</span>
+                                                </div>
+                                                <button onClick={() => removeBeerType(beer)} style={{ color: '#ff3b30', background: 'none', border: 'none' }}><Trash2 size={20} /></button>
                                             </div>
-                                            <button onClick={() => removeBeerType(beer)} style={{ color: '#ff3b30', background: 'none', border: 'none' }}><Trash2 size={20} /></button>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
                             </div>
                         </AccordionSection>
 
@@ -1465,26 +1556,88 @@ export default function SettingsPage() {
                                 </div>
 
                                 {selectedConversionSubtype !== 'Botella Tercio' && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <label className="text-secondary text-sm">Configurar para:</label>
-                                        <ContainerSelector value={selectedConversionSubtype} onChange={setSelectedConversionSubtype} />
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <div style={{
+                                            position: 'relative',
+                                            display: 'flex',
+                                            background: 'var(--bg-app)',
+                                            borderRadius: '999px',
+                                            padding: '2px',
+                                            height: '36px',
+                                            isolation: 'isolate',
+                                            maxWidth: '200px'
+                                        }}>
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: '2px', bottom: '2px', left: '2px',
+                                                width: 'calc(50% - 2px)',
+                                                background: 'var(--text-primary)',
+                                                borderRadius: '999px',
+                                                transform: normalizeSubtype(selectedConversionSubtype) === 'Lata' ? 'translateX(100%)' : 'translateX(0)',
+                                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                zIndex: 1
+                                            }} />
+                                            <button
+                                                onClick={() => setSelectedConversionSubtype('Botella')}
+                                                style={{ flex: 1, border: 'none', background: 'transparent', color: normalizeSubtype(selectedConversionSubtype) === 'Botella' ? 'var(--bg-card)' : 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem', zIndex: 2, cursor: 'pointer' }}
+                                            >
+                                                Botella
+                                            </button>
+                                            <button
+                                                onClick={() => setSelectedConversionSubtype('Lata Pequeña')}
+                                                style={{ flex: 1, border: 'none', background: 'transparent', color: normalizeSubtype(selectedConversionSubtype) === 'Lata' ? 'var(--bg-card)' : 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem', zIndex: 2, cursor: 'pointer' }}
+                                            >
+                                                Lata
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                             </div>
 
-                            {/* INPUTS NUEVOS: Nombre (Sin Unidades) */}
-                            <div className="input-group-large" style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-                                <input
-                                    type="text"
-                                    placeholder="Nombre (ej: Pack)"
-                                    className="ticket-input-large"
-                                    value={newEmissionName}
-                                    onChange={(e) => setNewEmissionName(e.target.value)}
-                                    style={{ flex: 1 }}
-                                />
-                                <button onClick={handleAddEmission} className="option-btn selected" style={{ padding: '1rem', height: 'auto', borderRadius: '50%' }}>
-                                    <Plus size={24} />
-                                </button>
+                            {/* INPUTS NUEVOS: Nombre (Sin Unidades) - Diseño de Tarjeta */}
+                            <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                                <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '1rem',
+                                    background: 'var(--bg-card-hover)',
+                                    padding: '1.25rem',
+                                    borderRadius: '20px',
+                                    border: '1px solid var(--accent-light)'
+                                }}>
+                                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                        <input
+                                            type="text"
+                                            placeholder="Nueva forma (ej: Pack 12, Combo)"
+                                            className="ticket-input-large"
+                                            value={newEmissionName}
+                                            onChange={(e) => setNewEmissionName(e.target.value)}
+                                            style={{
+                                                flex: 1,
+                                                padding: '0.75rem 1.25rem',
+                                                fontSize: '1rem',
+                                                height: '48px'
+                                            }}
+                                        />
+                                        <button
+                                            onClick={handleAddEmission}
+                                            className="option-btn selected"
+                                            style={{
+                                                padding: '0 1.5rem',
+                                                height: '48px',
+                                                borderRadius: '12px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                fontSize: '0.9rem',
+                                                minWidth: '120px'
+                                            }}
+                                        >
+                                            <Plus size={18} />
+                                            <span>Agregar</span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

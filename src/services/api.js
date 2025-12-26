@@ -212,6 +212,22 @@ export const upsertEmission = async (emissionData) => {
     return { data: data ? data[0] : null, error };
 };
 
+export const deleteProduct = async (id) => {
+    const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+    return { error };
+};
+
+export const deleteEmission = async (id) => {
+    const { error } = await supabase
+        .from('emission_types')
+        .delete()
+        .eq('id', id);
+    return { error };
+};
+
 export const resetDatabase = async () => {
     console.warn("Reset Database called - This is destructive in Supabase!");
     // Requires admin privileges or implementation choice. 

@@ -1,16 +1,23 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { ShoppingBag, Receipt, ClipboardList, Settings } from 'lucide-react';
+import { ShoppingBag, Receipt, ClipboardList, Settings, Shield } from 'lucide-react';
 import InventoryFab from '../components/InventoryFab';
+import { useAuth } from '../context/AuthContext';
 import './MainLayout.css';
 
 export default function MainLayout() {
+    const { role } = useAuth();
+
     const navItems = [
         { path: '/vender', label: 'Vender', icon: ShoppingBag },
         { path: '/caja', label: 'Caja', icon: Receipt },
         { path: '/pendientes', label: 'Pendientes', icon: ClipboardList },
         { path: '/ajustes', label: 'Ajustes', icon: Settings },
     ];
+
+    if (role === 'DEVELOPER') {
+        navItems.push({ path: '/developer', label: 'Dev', icon: Shield });
+    }
 
     const [isCompact, setIsCompact] = React.useState(false);
     const lastScrollY = React.useRef(0);

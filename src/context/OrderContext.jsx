@@ -1,10 +1,9 @@
 // ... (Imports remain same)
 import React, { createContext, useContext, useState, useEffect } from 'react';
-// import { supabase } from '../supabaseClient'; 
 import { useAuth } from './AuthContext';
 import { useProduct } from './ProductContext';
 import { useNotification } from './NotificationContext';
-import { createSales } from '../services/api';
+import { fetchSales, createSales } from '../services/api';
 
 const OrderContext = createContext();
 
@@ -38,6 +37,51 @@ export const OrderProvider = ({ children }) => {
         window.__DEV_SET_ORDERS__ = setPendingOrders;
         return () => { delete window.__DEV_SET_ORDERS__; };
     }, []);
+
+    // --- Sync Sales History from Supabase ---
+    useEffect(() => {
+        if (organizationId) {
+            const syncSales = async () => {
+                try {
+                    const { data, error } = await fetchSales(organizationId);
+                    if (error) throw error;
+
+                    if (data) {
+                        setPendingOrders(prev => {
+                            // Map of existing IDs (including the DB UUIDs and local IDs)
+                            const existingIds = new Set(prev.map(o => o.id));
+
+                            // Transform remote sales to match local order structure
+                            const remoteSales = data.map(sale => ({
+                                ...sale,
+                                id: sale.id, // Keep the UUID
+                                status: 'PAID',
+                                items: sale.items || [],
+                                totalAmountBs: sale.total_amount_bs || 0,
+                                totalAmountUsd: sale.total_amount_usd || 0,
+                                createdAt: sale.created_at,
+                                closedAt: sale.closed_at || sale.created_at,
+                                createdBy: sale.created_by || 'Desconocido'
+                            })).filter(sale => !existingIds.has(sale.id));
+
+                            if (remoteSales.length === 0) return prev;
+
+                            // Merge and keep sorted (newest first)
+                            const merged = [...prev, ...remoteSales].sort((a, b) =>
+                                new Date(b.createdAt) - new Date(a.createdAt)
+                            );
+
+                            // Optional: Limit history to last 200 items to avoid bloated localStorage
+                            return merged.slice(0, 200);
+                        });
+                    }
+                } catch (err) {
+                    console.error("Error syncing sales:", err);
+                }
+            };
+            syncSales();
+        }
+    }, [organizationId]);
 
     // --- Actions ---
 

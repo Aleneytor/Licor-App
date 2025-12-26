@@ -271,12 +271,12 @@ export default function SalesPage() {
             consumptionMode: mode
         }));
         if (mode === 'Local') setShowMixedBuilder(false);
-        setOpenSection('beer');
+        setOpenSection('emission');
     };
 
     const handleEmissionSelect = (option) => {
         setOrderState(prev => ({ ...prev, emission: option }));
-        setOpenSection(null);
+        setOpenSection('beer');
     };
 
     const handleVarietyToggle = (variety) => {
@@ -296,7 +296,7 @@ export default function SalesPage() {
         if (orderState.beerVariety === 'Variado' && orderState.consumptionMode === 'Para Llevar') return;
 
         setOrderState(prev => ({ ...prev, beerType: option }));
-        setOpenSection('emission');
+        setOpenSection(null);
     };
 
     const toggleSection = (section) => {
@@ -560,7 +560,32 @@ export default function SalesPage() {
                 </div>
             </AccordionSection>
 
-            {/* 2. Tipo de Cerveza */}
+            {/* 2. Forma de Emisión */}
+            <AccordionSection
+                title="Forma de Emisión"
+                isOpen={openSection === 'emission'}
+                onToggle={() => toggleSection('emission')}
+                selectionLabel={orderState.emission ? `${orderState.emission} (${orderState.subtype})` : null}
+                headerAction={
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <ContainerSelector value={orderState.subtype} onChange={(val) => setOrderState(prev => ({ ...prev, subtype: val, emission: null }))} />
+                    </div>
+                }
+            >
+                <div className="options-grid">
+                    {getEmissionsForSubtype(orderState.subtype).map(opt => (
+                        <button
+                            key={opt}
+                            className={`option-btn ${orderState.emission === opt ? 'selected' : ''}`}
+                            onClick={() => handleEmissionSelect(opt)}
+                        >
+                            {opt}
+                        </button>
+                    ))}
+                </div>
+            </AccordionSection>
+
+            {/* 3. Tipo de Cerveza */}
             <AccordionSection
                 title="Tipo de Cerveza"
                 isOpen={openSection === 'beer'}
@@ -623,31 +648,6 @@ export default function SalesPage() {
                         )}
                     </div>
                 )}
-            </AccordionSection>
-
-            {/* 3. Forma de Emisión */}
-            <AccordionSection
-                title="Forma de Emisión"
-                isOpen={openSection === 'emission'}
-                onToggle={() => toggleSection('emission')}
-                selectionLabel={orderState.emission ? `${orderState.emission} (${orderState.subtype})` : null}
-                headerAction={
-                    <div onClick={(e) => e.stopPropagation()}>
-                        <ContainerSelector value={orderState.subtype} onChange={(val) => setOrderState(prev => ({ ...prev, subtype: val, emission: null }))} />
-                    </div>
-                }
-            >
-                <div className="options-grid">
-                    {getEmissionsForSubtype(orderState.subtype).map(opt => (
-                        <button
-                            key={opt}
-                            className={`option-btn ${orderState.emission === opt ? 'selected' : ''}`}
-                            onClick={() => handleEmissionSelect(opt)}
-                        >
-                            {opt}
-                        </button>
-                    ))}
-                </div>
             </AccordionSection>
 
             {/* --- MIXED BUILDER MODAL --- */}
