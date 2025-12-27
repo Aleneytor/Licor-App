@@ -109,7 +109,7 @@ export default function MainLayout() {
                                 {getBlockMessage()}
                             </p>
                             <NavLink
-                                to="/ajustes"
+                                to="/ajustes?view=activation"
                                 style={{
                                     display: 'inline-block',
                                     padding: '12px 24px',
@@ -120,7 +120,7 @@ export default function MainLayout() {
                                     fontWeight: 600
                                 }}
                             >
-                                Ir a Ajustes
+                                Activar Ahora
                             </NavLink>
                         </div>
                     </div>

@@ -683,6 +683,11 @@ export const ProductProvider = ({ children }) => {
         });
     };
 
+    // --- AUTO-UPDATE RATES ON LOAD ---
+    useEffect(() => {
+        fetchRates();
+    }, []);
+
     const fetchRates = async () => {
         try {
             // We keep using dolarapi for USD as per existing logic, and add dolarvzla for Euro & History

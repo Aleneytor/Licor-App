@@ -48,7 +48,7 @@ export default function DeveloperPage() {
     const fetchKeys = async () => {
         const { data, error } = await supabase
             .from('license_keys')
-            .select('*, organizations(name, license_expires_at)')
+            .select('*, organizations:used_by_org_id(name, license_expires_at)')
             .order('created_at', { ascending: false });
         if (!error) setGeneratedKeys(data || []);
     };
@@ -335,9 +335,6 @@ export default function DeveloperPage() {
                     <h1 style={{ margin: 0, fontSize: '2.2rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Developer Console</h1>
                     <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '1.1rem' }}>Sistemas de Control & Analíticas Avanzadas</p>
                 </div>
-                <button onClick={() => { fetchEvents(); fetchKeys(); }} style={{ marginLeft: 'auto', background: 'var(--bg-card)', border: '1px solid var(--accent-light)', cursor: 'pointer', color: 'var(--text-primary)', padding: '12px', borderRadius: '12px', transition: 'all 0.2s' }}>
-                    <RefreshCcw size={20} />
-                </button>
             </div>
 
             {/* Navigation Tabs */}
@@ -607,6 +604,11 @@ export default function DeveloperPage() {
                                                         <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: k.plan_type === 'yearly' ? '#3b82f6' : (k.plan_type === 'free' ? '#94a3b8' : '#f97316') }}></div>
                                                         Plazo: {k.plan_type === 'yearly' ? 'ANUAL' : (k.plan_type === 'free' ? 'Prueba Gratuita' : '30 Días')}
                                                     </span>
+                                                    {k.status !== 'available' && k.used_at && (
+                                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, fontStyle: 'italic' }}>
+                                                            Activada: {formatDate(k.used_at)}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td style={{ padding: '1.5rem' }}>

@@ -75,23 +75,26 @@ export default function CompleteRegistration() {
         <div style={{
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            height: '100vh', background: '#f5f5f7', padding: '1rem'
+            height: '100vh', background: 'var(--bg-app)', padding: '1rem',
+            transition: 'background var(--transition-smooth)'
         }}>
             <div style={{
-                background: 'white', padding: '2rem', borderRadius: '24px',
+                background: 'var(--bg-card)', padding: '2.5rem 2rem', borderRadius: '32px',
                 width: '100%', maxWidth: '400px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
+                boxShadow: 'var(--shadow-soft)',
+                border: '1px solid var(--accent-light)',
+                transition: 'all var(--transition-smooth)'
             }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <div style={{
-                        background: '#34c759', width: '48px', height: '48px',
-                        borderRadius: '12px', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', margin: '0 auto 1rem auto'
+                        background: 'rgba(52, 199, 89, 0.1)', width: '56px', height: '56px',
+                        borderRadius: '16px', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', margin: '0 auto 1.5rem auto'
                     }}>
-                        <UserCheck color="white" size={24} />
+                        <UserCheck color="#34c759" size={28} />
                     </div>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Completar Registro</h2>
-                    <p style={{ color: '#666', marginTop: '0.5rem' }}>Configura tu cuenta para continuar</p>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Completar Registro</h2>
+                    <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', fontWeight: 500 }}>Configura tu cuenta para continuar</p>
                 </div>
 
                 {error && (
@@ -104,27 +107,26 @@ export default function CompleteRegistration() {
                 )}
 
                 <form onSubmit={handleComplete} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div className="input-group-large">
-                        <div style={{ color: '#888', marginBottom: '4px', fontSize: '0.8rem', marginLeft: '4px' }}>Nombre Completo</div>
-                        <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #ddd', borderRadius: '12px', padding: '0 12px', background: 'white' }}>
-                            <User size={20} color="#999" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ color: 'var(--text-secondary)', marginBottom: '4px', fontSize: '0.85rem', marginLeft: '4px', fontWeight: 600 }}>Nombre Completo</div>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <User size={20} color="var(--text-secondary)" style={{ position: 'absolute', left: '14px' }} />
                             <input
                                 type="text"
                                 placeholder="Ej: Juan Pérez"
                                 value={fullName}
                                 onChange={(e) => setFullName(e.target.value)}
                                 required
-                                style={{
-                                    border: 'none', outline: 'none', padding: '12px', width: '100%', fontSize: '1rem'
-                                }}
+                                className="ticket-input-large"
+                                style={{ paddingLeft: '44px' }}
                             />
                         </div>
                     </div>
 
-                    <div className="input-group-large">
-                        <div style={{ color: '#888', marginBottom: '4px', fontSize: '0.8rem', marginLeft: '4px' }}>Nueva Contraseña</div>
-                        <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #ddd', borderRadius: '12px', padding: '0 12px', background: 'white' }}>
-                            <Lock size={20} color="#999" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ color: 'var(--text-secondary)', marginBottom: '4px', fontSize: '0.85rem', marginLeft: '4px', fontWeight: 600 }}>Nueva Contraseña</div>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <Lock size={20} color="var(--text-secondary)" style={{ position: 'absolute', left: '14px' }} />
                             <input
                                 type="password"
                                 placeholder="********"
@@ -132,9 +134,8 @@ export default function CompleteRegistration() {
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                                 minLength={6}
-                                style={{
-                                    border: 'none', outline: 'none', padding: '12px', width: '100%', fontSize: '1rem'
-                                }}
+                                className="ticket-input-large"
+                                style={{ paddingLeft: '44px' }}
                             />
                         </div>
                     </div>
@@ -142,20 +143,17 @@ export default function CompleteRegistration() {
                     <button
                         type="submit"
                         disabled={loading}
-                        style={{
-                            background: '#000', color: 'white', padding: '1rem',
-                            borderRadius: '16px', border: 'none', fontSize: '1rem',
-                            fontWeight: 600, cursor: 'pointer', marginTop: '1rem',
-                            opacity: loading ? 0.7 : 1
-                        }}
+                        className="btn-primary-gradient"
+                        style={{ marginTop: '1.5rem' }}
                     >
                         {loading ? 'Guardando...' : 'Finalizar Registro'}
                     </button>
                 </form>
 
                 {!user && (
-                    <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.8rem', color: '#666' }}>
-                        Esperando autenticación... (Si no carga, vuelve a hacer clic en el correo)
+                    <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                        Esperando autenticación... <br />
+                        <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>(Si no carga, vuelve a hacer clic en el correo)</span>
                     </div>
                 )}
             </div>

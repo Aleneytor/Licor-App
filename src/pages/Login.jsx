@@ -35,12 +35,15 @@ export default function Login() {
         <div style={{
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            height: '100vh', background: '#f5f5f7', padding: '1rem'
+            height: '100vh', background: 'var(--bg-app)', padding: '1rem',
+            transition: 'background var(--transition-smooth)'
         }}>
             <div style={{
-                background: 'white', padding: '2rem', borderRadius: '24px',
+                background: 'var(--bg-card)', padding: '2.5rem 2rem', borderRadius: '32px',
                 width: '100%', maxWidth: '400px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
+                boxShadow: 'var(--shadow-soft)',
+                border: '1px solid var(--accent-light)',
+                transition: 'all var(--transition-smooth)'
             }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <div style={{
@@ -50,8 +53,8 @@ export default function Login() {
                     }}>
                         <img src="/KavasAppLogo.svg" alt="Kavas App Logo" style={{ width: '100%', height: '100%' }} />
                     </div>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Iniciar Sesión</h2>
-                    <p style={{ color: '#666', marginTop: '0.5rem' }}>Bienvenido de nuevo</p>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Iniciar Sesión</h2>
+                    <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', fontWeight: 500 }}>Bienvenido de nuevo</p>
                 </div>
 
                 {error && (
@@ -96,7 +99,7 @@ export default function Login() {
                                 background: 'none',
                                 border: 'none',
                                 cursor: 'pointer',
-                                color: '#999',
+                                color: 'var(--text-secondary)',
                                 display: 'flex',
                                 alignItems: 'center'
                             }}
@@ -115,13 +118,13 @@ export default function Login() {
                     </button>
                 </form>
 
-                <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem', color: '#666' }}>
+                <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
                     ¿No tienes cuenta?{' '}
-                    <Link to="/register" style={{ color: '#000', fontWeight: 600, textDecoration: 'none' }}>
+                    <Link to="/register" style={{ color: 'var(--accent-color)', fontWeight: 700, textDecoration: 'none' }}>
                         Regístrate
                     </Link>
-                    <div style={{ marginTop: '0.75rem' }}>
-                        <Link to="/forgot-password" style={{ color: '#666', fontSize: '0.85rem', textDecoration: 'none' }}>
+                    <div style={{ marginTop: '1rem' }}>
+                        <Link to="/forgot-password" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', textDecoration: 'none', opacity: 0.8 }}>
                             ¿Olvidaste tu contraseña?
                         </Link>
                     </div>

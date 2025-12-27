@@ -43,12 +43,15 @@ export default function ResetPassword() {
         <div style={{
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            height: '100vh', background: '#f5f5f7', padding: '1rem'
+            height: '100vh', background: 'var(--bg-app)', padding: '1rem',
+            transition: 'background var(--transition-smooth)'
         }}>
             <div style={{
-                background: 'white', padding: '2rem', borderRadius: '24px',
+                background: 'var(--bg-card)', padding: '2.5rem 2rem', borderRadius: '32px',
                 width: '100%', maxWidth: '400px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
+                boxShadow: 'var(--shadow-soft)',
+                border: '1px solid var(--accent-light)',
+                transition: 'all var(--transition-smooth)'
             }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <div style={{
@@ -58,8 +61,8 @@ export default function ResetPassword() {
                     }}>
                         <img src="/KavasAppLogo.svg" alt="Kavas App Logo" style={{ width: '100%', height: '100%' }} />
                     </div>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Nueva Contraseña</h2>
-                    <p style={{ color: '#666', marginTop: '0.5rem' }}>Ingresa tu nueva clave de acceso</p>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Nueva Contraseña</h2>
+                    <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', fontWeight: 500 }}>Ingresa tu nueva clave de acceso</p>
                 </div>
 
                 {error && (
@@ -74,11 +77,12 @@ export default function ResetPassword() {
                 {success ? (
                     <div style={{ textAlign: 'center' }}>
                         <div style={{
-                            background: '#D1FAE5', color: '#065F46', padding: '1.5rem',
-                            borderRadius: '12px', marginBottom: '1.5rem', fontSize: '1rem',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem'
+                            background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '2rem',
+                            borderRadius: '24px', marginBottom: '1.5rem', fontSize: '1.1rem',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem',
+                            fontWeight: 600, border: '1px solid rgba(16, 185, 129, 0.2)'
                         }}>
-                            <CheckCircle size={40} />
+                            <CheckCircle size={48} />
                             <span>¡Contraseña actualizada con éxito! Redirigiendo...</span>
                         </div>
                     </div>
@@ -101,7 +105,9 @@ export default function ResetPassword() {
                                 style={{
                                     position: 'absolute', right: '12px', top: '50%',
                                     transform: 'translateY(-50%)', background: 'none',
-                                    border: 'none', cursor: 'pointer', color: '#999'
+                                    border: 'none', cursor: 'pointer', color: 'var(--text-secondary)',
+                                    display: 'flex',
+                                    alignItems: 'center'
                                 }}
                             >
                                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}

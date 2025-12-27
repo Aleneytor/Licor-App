@@ -88,12 +88,15 @@ export default function Register() {
         <div style={{
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            height: '100vh', background: '#f5f5f7', padding: '1rem'
+            height: '100vh', background: 'var(--bg-app)', padding: '1rem',
+            transition: 'background var(--transition-smooth)'
         }}>
             <div style={{
-                background: 'white', padding: '2rem', borderRadius: '24px',
+                background: 'var(--bg-card)', padding: '2.5rem 2rem', borderRadius: '32px',
                 width: '100%', maxWidth: '400px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
+                boxShadow: 'var(--shadow-soft)',
+                border: '1px solid var(--accent-light)',
+                transition: 'all var(--transition-smooth)'
             }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <div style={{
@@ -103,8 +106,8 @@ export default function Register() {
                     }}>
                         <img src="/KavasAppLogo.svg" alt="Kavas App Logo" style={{ width: '100%', height: '100%' }} />
                     </div>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Crear Cuenta</h2>
-                    <p style={{ color: '#666', marginTop: '0.5rem' }}>Únete a la plataforma</p>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Crear Cuenta</h2>
+                    <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', fontWeight: 500 }}>Únete a la plataforma</p>
                 </div>
 
                 {error && (
@@ -125,7 +128,7 @@ export default function Register() {
                             onChange={(e) => setFullName(e.target.value)}
                             required
                             className="ticket-input-large"
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #ddd' }}
+                            style={{ width: '100%', boxSizing: 'border-box' }}
                         />
                     </div>
                     <div className="input-group-large">
@@ -136,7 +139,7 @@ export default function Register() {
                             onChange={(e) => setEmail(e.target.value)}
                             required
                             className="ticket-input-large"
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #ddd' }}
+                            style={{ width: '100%', boxSizing: 'border-box' }}
                         />
                     </div>
                     <div className="input-group-large" style={{ position: 'relative' }}>
@@ -147,14 +150,16 @@ export default function Register() {
                             onChange={(e) => setPassword(e.target.value)}
                             required
                             className="ticket-input-large"
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1px solid #ddd', paddingRight: '40px' }}
+                            style={{ width: '100%', boxSizing: 'border-box', paddingRight: '44px' }}
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
                             style={{
                                 position: 'absolute', right: '12px', top: '50%',
-                                transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#999'
+                                color: 'var(--text-secondary)',
+                                display: 'flex',
+                                alignItems: 'center'
                             }}
                         >
                             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -164,27 +169,27 @@ export default function Register() {
                     {/* Checkbox de Dueño */}
                     <div style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '1rem', background: '#f9fafb', borderRadius: '16px',
-                        border: isOwner ? '1px solid #000' : '1px solid #e5e7eb',
-                        cursor: 'pointer'
+                        padding: '1rem', background: 'var(--bg-card-hover)', borderRadius: '16px',
+                        border: isOwner ? '2px solid var(--accent-color)' : '1px solid var(--accent-light)',
+                        cursor: 'pointer', transition: 'all 0.2s'
                     }} onClick={() => setIsOwner(!isOwner)}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <div style={{
                                 width: '36px', height: '36px', borderRadius: '50%',
-                                background: isOwner ? '#000' : '#e5e7eb',
+                                background: isOwner ? 'var(--accent-color)' : 'var(--accent-light)',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center'
                             }}>
-                                <Store size={18} color={isOwner ? 'white' : '#6b7280'} />
+                                <Store size={18} color={isOwner ? 'white' : 'var(--text-secondary)'} />
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>Soy Dueño de Negocio</span>
-                                <span style={{ fontSize: '0.8rem', color: '#666' }}>Crear nueva licorería</span>
+                                <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>Soy Dueño de Negocio</span>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Crear nueva licorería</span>
                             </div>
                         </div>
                         <div style={{
                             width: '20px', height: '20px', borderRadius: '50%',
-                            border: isOwner ? '6px solid #000' : '2px solid #ccc',
-                            background: 'white'
+                            border: isOwner ? '6px solid var(--accent-color)' : '2px solid var(--text-muted)',
+                            background: isOwner ? 'white' : 'transparent'
                         }}></div>
                     </div>
 
@@ -197,7 +202,7 @@ export default function Register() {
                                 onChange={(e) => setLiquorStoreName(e.target.value)}
                                 required={isOwner}
                                 className="ticket-input-large"
-                                style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #000', padding: '12px', borderRadius: '12px' }}
+                                style={{ width: '100%', boxSizing: 'border-box', border: '2px solid var(--accent-color)' }}
                             />
                         </div>
                     )}
@@ -212,9 +217,9 @@ export default function Register() {
                     </button>
                 </form>
 
-                <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem', color: '#666' }}>
+                <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
                     ¿Ya tienes cuenta?{' '}
-                    <Link to="/login" style={{ color: '#000', fontWeight: 600, textDecoration: 'none' }}>
+                    <Link to="/login" style={{ color: 'var(--accent-color)', fontWeight: 700, textDecoration: 'none' }}>
                         Inicia Sesión
                     </Link>
                 </div>
@@ -228,19 +233,20 @@ export default function Register() {
                     zIndex: 2000, backdropFilter: 'blur(4px)'
                 }}>
                     <div style={{
-                        background: 'white', borderRadius: '32px', padding: '2rem',
+                        background: 'var(--bg-card)', borderRadius: '32px', padding: '2.5rem 2rem',
                         width: '100%', maxWidth: '360px', textAlign: 'center',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                        border: '1px solid var(--accent-light)'
                     }}>
                         <div style={{
-                            background: '#FFF3E0', width: '80px', height: '80px',
+                            background: 'rgba(249, 115, 22, 0.1)', width: '84px', height: '84px',
                             borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                             margin: '0 auto 1.5rem auto'
                         }}>
-                            <PartyPopper size={40} color="#E65100" />
+                            <PartyPopper size={44} color="var(--accent-color)" />
                         </div>
-                        <h3 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>¡Bienvenido!</h3>
-                        <p style={{ color: '#666', marginBottom: '2rem' }}>Tu licorería ha sido registrada.</p>
+                        <h3 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>¡Bienvenido!</h3>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontWeight: 500 }}>Tu licorería ha sido registrada.</p>
                         <button
                             onClick={() => navigate('/login')}
                             className="btn-primary-gradient"
