@@ -839,14 +839,18 @@ export default function SettingsPage() {
     }, [role, organizationId, currentView]);
 
     // --- ENSURE TERCIO EXISTS ---
+    const tercioCreationAttempted = React.useRef(false);
+
     useEffect(() => {
         if (!beerTypes || beerTypes.length === 0) return;
         if (!['master', 'owner', 'admin', 'manager', 'developer'].some(r => role?.toLowerCase()?.includes(r))) return;
+        if (tercioCreationAttempted.current) return; // Ya intentamos crear Tercio
 
         const hasTercio = beerTypes.some(b => b.toLowerCase() === 'tercio');
         if (!hasTercio) {
             console.log("Auto-creating constant Tercio product...");
-            addBeerType('Tercio', '#EA580C', 'Botella Tercio');
+            tercioCreationAttempted.current = true; // Marcar como intentado
+            addBeerType('Tercio', '#EA580C');
         }
     }, [beerTypes, role, addBeerType]);
 

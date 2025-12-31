@@ -12,6 +12,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import DeveloperPage from './pages/DeveloperPage';
 import ActivateLicense from './pages/ActivateLicense';
+import LandingPage from './pages/LandingPage';
 
 import ScrollToTop from './components/ScrollToTop';
 import { ProductProvider } from './context/ProductContext';
@@ -48,6 +49,7 @@ function App() {
 
                   <Routes>
                     {/* Public Routes */}
+                    <Route path="/" element={<LandingPage />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -57,13 +59,12 @@ function App() {
 
                     {/* Protected Routes */}
                     <Route element={<PrivateRoute />}>
-                      <Route path="/" element={<MainLayout />}>
-                        <Route index element={<Navigate to="/vender" replace />} />
-                        <Route path="vender" element={<SalesPage />} />
-                        <Route path="caja" element={<CashPage />} />
-                        <Route path="pendientes" element={<PendingPage />} />
-                        <Route path="ajustes" element={<SettingsPage />} />
-                        <Route path="developer" element={<DeveloperPage />} /> {/* NEW */}
+                      <Route element={<MainLayout />}>
+                        <Route path="/vender" element={<SalesPage />} />
+                        <Route path="/caja" element={<CashPage />} />
+                        <Route path="/pendientes" element={<PendingPage />} />
+                        <Route path="/ajustes" element={<SettingsPage />} />
+                        <Route path="/developer" element={<DeveloperPage />} />
                       </Route>
                     </Route>
                   </Routes>

@@ -69,7 +69,7 @@ export default function DeveloperPage() {
     const fetchKeys = async () => {
         const { data, error } = await supabase
             .from('license_keys')
-            .select('*, organizations:used_by_org_id(name, license_expires_at)')
+            .select('*, organizations:used_by_org_id(name, license_expires_at, trial_started_at, is_active)')
             .order('created_at', { ascending: false });
         if (!error) setGeneratedKeys(data || []);
     };
@@ -761,12 +761,43 @@ export default function DeveloperPage() {
                                                     ) : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>Libre</span>}
                                                 </td>
                                                 <td style={{ padding: '1.5rem' }}>
-                                                    {k.organizations?.license_expires_at ? (
-                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                            <span style={{ fontWeight: 700, fontSize: '0.9rem', color: isExp ? '#f87171' : (isSoon ? '#fbbf24' : 'var(--text-primary)') }}>{formatDate(k.organizations.license_expires_at)}</span>
-                                                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: isExp ? '#f87171' : (isSoon ? '#fbbf24' : '#10b981') }}>{isExp ? 'EXPIRADA' : `${daysLeft}d restantes`}</span>
-                                                        </div>
-                                                    ) : '-'}
+                                                    {(() => {
+                                                        const org = k.organizations;
+
+                                                        // Si tiene licencia activa con fecha de expiración
+                                                        if (org?.license_expires_at && org?.is_active) {
+                                                            return (
+                                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: isExp ? '#f87171' : (isSoon ? '#fbbf24' : 'var(--text-primary)') }}>{formatDate(org.license_expires_at)}</span>
+                                                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: isExp ? '#f87171' : (isSoon ? '#fbbf24' : '#10b981') }}>{isExp ? 'EXPIRADA' : `${daysLeft}d restantes`}</span>
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        // Si tiene trial activo (trial_started_at existe y no tiene licencia activa)
+                                                        if (org?.trial_started_at && !org?.is_active) {
+                                                            const trialStart = new Date(org.trial_started_at);
+                                                            const trialEnd = new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+                                                            const now = new Date();
+                                                            const diffTime = trialEnd - now;
+                                                            const trialDaysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                                            const isTrialActive = trialDaysLeft > 0;
+
+                                                            return (
+                                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: isTrialActive ? '#3b82f6' : '#f87171' }}>
+                                                                        {isTrialActive ? 'Trial Activo' : 'Trial Expirado'}
+                                                                    </span>
+                                                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: isTrialActive ? '#3b82f6' : '#f87171' }}>
+                                                                        {isTrialActive ? `${trialDaysLeft}d restantes` : 'Necesita licencia'}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        // Sin licencia ni trial
+                                                        return '-';
+                                                    })()}
                                                 </td>
                                                 <td style={{ padding: '1.5rem', textAlign: 'right' }}>
                                                     <button onClick={() => deleteKey(k.id)} style={{ color: '#f87171', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', cursor: 'pointer', padding: '10px', borderRadius: '10px' }}>
@@ -864,12 +895,39 @@ export default function DeveloperPage() {
                                                     <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{k.organizations.name}</span>
                                                 </div>
                                             )}
-                                            {k.organizations?.license_expires_at && (
+                                            {(k.organizations?.license_expires_at || k.organizations?.trial_started_at) && (
                                                 <div style={{ gridColumn: 'span 2' }}>
-                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>Vencimiento</div>
-                                                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: isExp ? '#f87171' : (isSoon ? '#fbbf24' : '#10b981') }}>
-                                                        {formatDate(k.organizations.license_expires_at)} ({isExp ? 'EXPIRADA' : `${daysLeft}d restantes`})
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                                                        {k.organizations?.trial_started_at && !k.organizations?.is_active ? 'Trial' : 'Vencimiento'}
                                                     </div>
+                                                    {(() => {
+                                                        const org = k.organizations;
+
+                                                        // Si tiene licencia activa
+                                                        if (org?.license_expires_at && org?.is_active) {
+                                                            return (
+                                                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: isExp ? '#f87171' : (isSoon ? '#fbbf24' : '#10b981') }}>
+                                                                    {formatDate(org.license_expires_at)} ({isExp ? 'EXPIRADA' : `${daysLeft}d restantes`})
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        // Si tiene trial
+                                                        if (org?.trial_started_at && !org?.is_active) {
+                                                            const trialStart = new Date(org.trial_started_at);
+                                                            const trialEnd = new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+                                                            const trialDaysLeft = Math.ceil((trialEnd - new Date()) / (1000 * 60 * 60 * 24));
+                                                            const isTrialActive = trialDaysLeft > 0;
+
+                                                            return (
+                                                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: isTrialActive ? '#3b82f6' : '#f87171' }}>
+                                                                    {isTrialActive ? `Trial Activo (${trialDaysLeft}d)` : 'Trial Expirado - Necesita Licencia'}
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        return null;
+                                                    })()}
                                                 </div>
                                             )}
                                         </div>

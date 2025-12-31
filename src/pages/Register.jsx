@@ -252,8 +252,8 @@ export default function Register() {
                         }}>
                             <PartyPopper size={44} color="var(--accent-color)" />
                         </div>
-                        <h3 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>¡Bienvenido!</h3>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontWeight: 500 }}>Tu licorería ha sido registrada.</p>
+                        <h3 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>¡Casi listo!</h3>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontWeight: 500 }}>Revisa tu correo electrónico para confirmar tu cuenta y poder iniciar sesión.</p>
                         <button
                             onClick={() => navigate('/login')}
                             className="btn-primary-gradient"

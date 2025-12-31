@@ -62,7 +62,7 @@ export function AuthProvider({ children }) {
                 if (profile.organization_id) {
                     const { data: org, error: orgError } = await supabase
                         .from('organizations')
-                        .select('name, is_active, license_expires_at, plan_type')
+                        .select('name, is_active, license_expires_at, plan_type, trial_started_at')
                         .eq('id', profile.organization_id)
                         .single();
 
@@ -78,7 +78,16 @@ export function AuthProvider({ children }) {
                         const expiryDate = org.license_expires_at ? new Date(org.license_expires_at) : null;
                         const isExpired = expiryDate ? expiryDate < new Date() : false;
 
-                        setIsLicenseActive(isDev || (isActive && !isExpired));
+                        // ⭐ NUEVO: Verificar si está en período de prueba de 7 días
+                        const trialStarted = org.trial_started_at ? new Date(org.trial_started_at) : null;
+                        const trialEnds = trialStarted ? new Date(trialStarted.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+                        const isInTrial = trialStarted && trialEnds && new Date() < trialEnds && !isActive;
+
+                        // Usuario tiene acceso si:
+                        // 1. Es developer, O
+                        // 2. Tiene licencia activa y no expirada, O
+                        // 3. Está en período de prueba de 7 días
+                        setIsLicenseActive(isDev || (isActive && !isExpired) || isInTrial);
                     } else {
                         console.error('Error fetching org name:', orgError);
                         setOrganizationName('Desconocida');
@@ -161,12 +170,18 @@ export function AuthProvider({ children }) {
                 return;
             }
             if (organizationId) {
-                const { data, error } = await supabase.from('organizations').select('is_active, license_expires_at, plan_type').eq('id', organizationId).single();
+                const { data, error } = await supabase.from('organizations').select('is_active, license_expires_at, plan_type, trial_started_at').eq('id', organizationId).single();
                 if (!error && data) {
                     const isActive = data.is_active === true;
                     const expiryDate = data.license_expires_at ? new Date(data.license_expires_at) : null;
                     const isExpired = expiryDate ? expiryDate < new Date() : false;
-                    setIsLicenseActive(isActive && !isExpired);
+
+                    // Verificar trial
+                    const trialStarted = data.trial_started_at ? new Date(data.trial_started_at) : null;
+                    const trialEnds = trialStarted ? new Date(trialStarted.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+                    const isInTrial = trialStarted && trialEnds && new Date() < trialEnds && !isActive;
+
+                    setIsLicenseActive((isActive && !isExpired) || isInTrial);
                     setPlanType(data.plan_type);
                     setLicenseExpiresAt(data.license_expires_at);
                 }
