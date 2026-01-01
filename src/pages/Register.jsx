@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
-import { UserPlus, Store, Eye, EyeOff, PartyPopper } from 'lucide-react';
+import { Store, Eye, EyeOff, PartyPopper } from 'lucide-react';
 import './SalesPage.css';
 
 export default function Register() {
@@ -21,7 +21,7 @@ export default function Register() {
         setLoading(true);
         setError('');
 
-        // 1. Validación estricta antes de enviar nada
+        // 1. Validación: si es dueño, debe tener nombre de licorería
         if (isOwner && !liquorStoreName.trim()) {
             setError('El nombre de la licorería es obligatorio para dueños.');
             setLoading(false);
@@ -29,35 +29,43 @@ export default function Register() {
         }
 
         try {
-            // 2. Preparamos la metadata con cuidado
+            // 2. Preparamos la metadata
             const metadata = {
                 full_name: fullName,
-                // IMPORTANTE: Si es dueño, mandamos el nombre. Si no, no mandamos la clave o mandamos null.
-                liquor_store_name: isOwner ? liquorStoreName : null,
+                // Solo incluir liquor_store_name si es dueño
+                liquor_store_name: isOwner ? liquorStoreName.trim() : null,
             };
 
             console.log('Enviando registro a Supabase:', metadata);
 
-            // 3. Enviamos a Supabase
+            // 3. Enviamos a Supabase con URL de redirección explícita
+            const redirectTo = window.location.origin + '/login';
+
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: email,
                 password: password,
                 options: {
-                    data: metadata, // Aquí viaja la información para el Trigger SQL (si se usa)
+                    data: metadata,
+                    emailRedirectTo: redirectTo
                 },
             });
 
             if (authError) throw authError;
 
-            // 4. Lógica Manual de Respaldo por si el Trigger falla o es lento o si requerimos insercion explicita
+            // 4. Lógica Manual de Respaldo por si el Trigger falla o es lento
             // Si hay sesión activa (porque Email Confirm está apagado o es auto-login)
             if (authData.session && isOwner && liquorStoreName) {
                 const userId = authData.user.id;
 
-                // A. Crear Organización
+                // A. Crear Organización SIN LICENCIA ACTIVA
                 const { data: orgData, error: orgError } = await supabase
                     .from('organizations')
-                    .insert([{ name: liquorStoreName }])
+                    .insert([{
+                        name: liquorStoreName,
+                        is_active: false,              // Sin licencia
+                        trial_started_at: null,        // Sin trial
+                        plan_type: null                // Sin plan
+                    }])
                     .select()
                     .single();
 
@@ -184,7 +192,8 @@ export default function Register() {
                             <div style={{
                                 width: '36px', height: '36px', borderRadius: '50%',
                                 background: isOwner ? 'var(--accent-color)' : 'var(--accent-light)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                transition: 'all 0.2s'
                             }}>
                                 <Store size={18} color={isOwner ? 'white' : 'var(--text-secondary)'} />
                             </div>
@@ -196,7 +205,8 @@ export default function Register() {
                         <div style={{
                             width: '20px', height: '20px', borderRadius: '50%',
                             border: isOwner ? '6px solid var(--accent-color)' : '2px solid var(--text-muted)',
-                            background: isOwner ? 'white' : 'transparent'
+                            background: isOwner ? 'white' : 'transparent',
+                            transition: 'all 0.2s'
                         }}></div>
                     </div>
 
@@ -209,7 +219,12 @@ export default function Register() {
                                 onChange={(e) => setLiquorStoreName(e.target.value)}
                                 required={isOwner}
                                 className="ticket-input-large"
-                                style={{ width: '100%', boxSizing: 'border-box', border: '2px solid var(--accent-color)' }}
+                                style={{
+                                    width: '100%',
+                                    boxSizing: 'border-box',
+                                    border: '2px solid var(--accent-color)',
+                                    background: 'var(--bg-card-hover)'
+                                }}
                             />
                         </div>
                     )}

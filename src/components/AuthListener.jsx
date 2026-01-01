@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useNotification } from '../context/NotificationContext';
 
@@ -8,6 +9,7 @@ import { useNotification } from '../context/NotificationContext';
  */
 export default function AuthListener() {
     const { showNotification } = useNotification();
+    const navigate = useNavigate();
 
     useEffect(() => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -17,28 +19,36 @@ export default function AuthListener() {
 
                 // Caso 1: Confirmación de Correo (Signup)
                 if (hash.includes('type=signup') || hash.includes('type=invite')) {
-                    showNotification('¡Correo verificado con éxito! Bienvenido.', 'success');
-                    // Limpiamos los tokens de la URL para que se vea limpia
+                    showNotification('¡Correo verificado con éxito! Bienvenido a Kavas App.', 'success');
+                    // Limpiamos los tokens de la URL
                     window.history.replaceState(null, null, window.location.pathname);
+
+                    // Redirigir al usuario a la página principal
+                    setTimeout(() => {
+                        navigate('/vender');
+                    }, 500);
                 }
 
                 // Caso 2: Recuperación de Contraseña
                 if (hash.includes('type=recovery')) {
                     showNotification('Enlace de recuperación validado.', 'success');
-                    window.history.replaceState(null, null, window.location.pathname);
+                    // Redirigir a la página de reset
+                    window.history.replaceState(null, null, '/reset-password');
+                    navigate('/reset-password');
                 }
             }
 
-            // Detectar renovación de token o errores
-            if (event === 'USER_UPDATED') {
-                // Podría usarse para confirmar cambios de perfil
+            // Detectar cierre de sesión
+            if (event === 'SIGNED_OUT') {
+                // Redirigir al login cuando se cierra sesión
+                navigate('/login');
             }
         });
 
         return () => {
             if (subscription) subscription.unsubscribe();
         };
-    }, [showNotification]);
+    }, [showNotification, navigate]);
 
     return null;
 }

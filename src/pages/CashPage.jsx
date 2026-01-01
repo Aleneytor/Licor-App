@@ -1,7 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ErrorBoundary from '../components/ErrorBoundary'; // Import ErrorBoundary
 import { useOrder } from '../context/OrderContext';
 import { useProduct } from '../context/ProductContext';
+import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import {
     DollarSign, CheckCircle, Clock, Receipt, TrendingUp, Calendar, Download,
@@ -11,6 +13,8 @@ import * as XLSX from 'xlsx';
 import './CashPage.css'; // Premium Styles
 
 export function CashPageContent() {
+    const navigate = useNavigate();
+    const { role } = useAuth();
     const orderContext = useOrder();
     const productContext = useProduct();
     const notificationContext = useNotification();
@@ -26,6 +30,13 @@ export function CashPageContent() {
     const [showProfitModal, setShowProfitModal] = useState(false);
     const [showWeeklyModal, setShowWeeklyModal] = useState(false);
     const [weekOffset, setWeekOffset] = useState(0);
+
+    // Redirect employees - they don't have access to CashPage
+    useEffect(() => {
+        if (role?.toLowerCase() === 'employee') {
+            navigate('/');
+        }
+    }, [role, navigate]);
 
     // Initial Data Check
     if (!orderContext || !productContext) {

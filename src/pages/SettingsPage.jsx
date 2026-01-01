@@ -5,10 +5,11 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
 import { supabase } from '../supabaseClient';
-import { Trash2, Plus, Save, ChevronRight, ChevronLeft, CircleDollarSign, Users, Package, Star, Box, Send, LogOut, Moon, Sun, Store, ShoppingBag, Search, ChevronDown, ChevronUp, X, Pencil, Check, ShieldCheck, Key, Zap, Trophy, CheckCircle2, MessageCircle } from 'lucide-react';
+import { Trash2, Plus, Save, ChevronRight, ChevronLeft, CircleDollarSign, Users, Package, Star, Box, Send, LogOut, Moon, Sun, Store, ShoppingBag, Search, ChevronDown, ChevronUp, X, Pencil, Check, ShieldCheck, Key, Zap, Trophy, CheckCircle2, AlertCircle, MessageCircle } from 'lucide-react';
 import AccordionSection from '../components/AccordionSection';
 import StockManager from '../components/StockManager';
 import ContainerSelector from '../components/ContainerSelector';
+import LicenseStatusBanner from '../components/LicenseStatusBanner';
 import './SalesPage.css';
 
 // --- Helpers for Fuzzy Search ---
@@ -770,6 +771,32 @@ const BeerPriceEditor = ({ beerName, searchFilter = '' }) => {
     );
 };
 
+// --- Sub-component: PlanFeatures ---
+const PlanFeatures = ({ features, light = false }) => (
+    <ul style={{
+        listStyle: 'none',
+        padding: 0,
+        margin: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem'
+    }}>
+        {features.map((feature, index) => (
+            <li key={index} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                fontSize: '0.9rem',
+                color: light ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)',
+                fontWeight: 500
+            }}>
+                <CheckCircle2 size={16} color="#10B981" />
+                {feature}
+            </li>
+        ))}
+    </ul>
+);
+
 // --- Main Component: SettingsPage ---
 export default function SettingsPage() {
     console.log("SettingsPage Loaded");
@@ -807,6 +834,8 @@ export default function SettingsPage() {
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [pickerPos, setPickerPos] = useState({ top: 0, left: 0 });
     const [selectedPlanTab, setSelectedPlanTab] = useState('free'); // 'free', 'monthly', 'yearly'
+    const [showTrialModal, setShowTrialModal] = useState(false);
+    const [isActivating, setIsActivating] = useState(false);
 
     const WHATSAPP_NUMBER = "584220131019";
 
@@ -829,10 +858,30 @@ export default function SettingsPage() {
             if (role && ['master', 'owner', 'admin', 'manager', 'developer'].some(r => role.toLowerCase().includes(r))) {
                 const { data, error } = await supabase
                     .from('organizations')
-                    .select('license_key, is_active, plan_type, license_expires_at')
+                    .select('license_key, is_active, plan_type, license_expires_at, trial_started_at')
                     .eq('id', organizationId)
                     .single();
-                if (data) setLicenseInfo(data);
+
+                if (data) {
+                    // Calculate trial info
+                    let trialInfo = null;
+                    if (data.trial_started_at && !data.is_active) {
+                        const trialStart = new Date(data.trial_started_at);
+                        const trialEnd = new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+                        const now = new Date();
+                        const daysLeft = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24));
+                        const isActive = daysLeft > 0;
+
+                        trialInfo = {
+                            isActive,
+                            daysLeft,
+                            expiresAt: trialEnd,
+                            startedAt: trialStart
+                        };
+                    }
+
+                    setLicenseInfo({ ...data, trialInfo });
+                }
             }
         };
         fetchLicense();
@@ -868,7 +917,7 @@ export default function SettingsPage() {
             case 'yearly': return 'ANUAL';
             case 'free': return 'PRUEBA GRATUITA';
             case 'monthly': return '30 Días';
-            default: return type?.toUpperCase() || 'PREMIUM';
+            default: return type ? type.toUpperCase() : 'SIN PLAN';
         }
     };
 
@@ -990,6 +1039,28 @@ export default function SettingsPage() {
             console.error(err);
             showNotification(err.message || "Error enviando invitación", 'error');
             setInviteStatus('error');
+        }
+    };
+
+    const handleConfirmTrial = async () => {
+        if (!organizationId) return;
+        setIsActivating(true);
+        try {
+            const { error } = await supabase
+                .from('organizations')
+                .update({ trial_started_at: new Date().toISOString() })
+                .eq('id', organizationId);
+
+            if (error) throw error;
+
+            await refreshLicense();
+            setShowTrialModal(false);
+            showNotification('¡Prueba gratis activada por 7 días!', 'success');
+        } catch (err) {
+            console.error('Error activating trial:', err);
+            showNotification('Error al activar la prueba', 'error');
+        } finally {
+            setIsActivating(false);
         }
     };
 
@@ -1137,15 +1208,33 @@ export default function SettingsPage() {
                             width: '40px', height: '40px',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             borderRadius: '12px', flexShrink: 0,
-                            boxShadow: `0 4px 12px ${item.color}40`
+                            boxShadow: `0 4px 12px ${item.color}33`
                         }}>
                             <item.icon size={20} color="white" />
                         </div>
-                        <span style={{
-                            fontSize: '1rem',
-                            fontWeight: 700,
-                            color: theme === 'light' ? '#1E1E1E' : 'var(--text-primary)'
-                        }}>{item.label}</span>
+                        <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {item.label}
+                        </span>
+
+                        {/* STATUS BADGE FOR ACTIVATION */}
+                        {item.id === 'activation' && (licenseInfo?.is_active || licenseInfo?.trialInfo?.isActive) && (
+                            <div style={{
+                                background: '#10b981',
+                                color: 'white',
+                                fontSize: '0.65rem',
+                                fontWeight: 900,
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                marginLeft: '8px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                            }}>
+                                {licenseInfo?.is_active
+                                    ? getPlanLabel(licenseInfo.plan_type)
+                                    : `PRUEBA ${licenseInfo?.trialInfo?.daysLeft}D`}
+                            </div>
+                        )}
                     </div>
                     {!isDisabled && <ChevronRight size={18} color="#999" />}
                 </button>
@@ -1170,10 +1259,22 @@ export default function SettingsPage() {
                 )}
 
                 {/* --- GESTIÓN --- */}
-                <SectionSeparator label="Gestion" />
-                <MenuOption item={{ id: 'products', label: 'Gestion de Productos', icon: Package, color: '#4ade80' }} />
-                <MenuOption item={{ id: 'dashboard', label: 'Precios Actuales', icon: Star, color: '#3b82f6' }} />
-                <MenuOption item={{ id: 'inventory', label: 'Inventario', icon: Box, color: '#a3e635' }} />
+                {role?.toLowerCase() !== 'employee' && (
+                    <>
+                        <SectionSeparator label="Gestion" />
+                        <MenuOption item={{ id: 'products', label: 'Gestion de Productos', icon: Package, color: '#4ade80' }} />
+                        <MenuOption item={{ id: 'dashboard', label: 'Precios Actuales', icon: Star, color: '#3b82f6' }} />
+                        <MenuOption item={{ id: 'inventory', label: 'Inventario', icon: Box, color: '#a3e635' }} />
+                    </>
+                )}
+
+                {/* Employees can ONLY see Dashboard (read-only) */}
+                {role?.toLowerCase() === 'employee' && (
+                    <>
+                        <SectionSeparator label="Consulta" />
+                        <MenuOption item={{ id: 'dashboard', label: 'Precios Actuales', icon: Star, color: '#3b82f6' }} />
+                    </>
+                )}
 
                 {/* --- GENERAL --- */}
                 <SectionSeparator label="General" />
@@ -1260,7 +1361,12 @@ export default function SettingsPage() {
     };
 
     return (
-        <div className="sales-container-v2" style={{ padding: '1rem' }}>
+        <div className="sales-container-v2" style={{
+            padding: isMobile ? '1rem' : '2rem',
+            maxWidth: currentView === 'activation' ? '1300px' : '800px',
+            margin: '0 auto',
+            width: '100%'
+        }}>
             {/* Header - Only show for subviews */}
             {currentView !== 'main' && (
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem', position: 'relative' }}>
@@ -1281,8 +1387,12 @@ export default function SettingsPage() {
                 </div>
             )}
 
-            {currentView === 'main' && <MainMenu />}
+            {/* License Status Banner - Solo en vista principal si no hay licencia activa */}
+            {currentView === 'main' && !isLicenseActive && (
+                <LicenseStatusBanner onTrialClick={() => setShowTrialModal(true)} />
+            )}
 
+            {currentView === 'main' && <MainMenu />}
 
 
             {currentView === 'bcv' && (
@@ -1717,418 +1827,224 @@ export default function SettingsPage() {
 
             {
                 currentView === 'activation' && (
-                    <div className="order-summary-card">
-                        <div style={{ padding: '2rem', textAlign: 'center' }}>
-                            <div style={{
-                                width: '80px', height: '80px',
-                                background: licenseInfo?.is_active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(234, 88, 12, 0.1)',
-                                borderRadius: '50%',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                margin: '0 auto 1.5rem auto'
-                            }}>
-                                <Key size={40} color={licenseInfo?.is_active ? '#10b981' : '#f97316'} />
+                    <div className="order-summary-card" style={{
+                        maxWidth: '1200px',
+                        width: '100%',
+                        margin: '0 auto',
+                        padding: 0 // Remove default card padding to use our local padding
+                    }}>
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: isMobile ? 'column' : 'row',
+                            gap: isMobile ? '2.5rem' : '4rem',
+                            padding: isMobile ? '1.5rem' : '3.5rem',
+                            justifyContent: 'center',
+                            alignItems: 'flex-start'
+                        }}>
+
+                            {/* --- LEFT COLUMN: PLANS & ACTIVATION (60%) --- */}
+                            <div style={{ flex: isMobile ? '1' : '0 1 60%', width: '100%', display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'center' : 'flex-start' }}>
+                                <div style={{ textAlign: isMobile ? 'center' : 'left', marginBottom: '3rem' }}>
+                                    <h2 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                                        {role?.toLowerCase() === 'developer' ? 'Modo Desarrollador' : 'Activar Producto'}
+                                    </h2>
+                                    <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', maxWidth: '500px' }}>
+                                        {role?.toLowerCase() === 'developer'
+                                            ? 'Tienes acceso total e ilimitado a todas las funciones del sistema por ser Administrador de Sistema.'
+                                            : 'Elige el plan que mejor se adapte a tus necesidades y desbloquea todas las funciones premium.'}
+                                    </p>
+                                </div>
+
+                                {role?.toLowerCase() !== 'developer' && (
+                                    <>
+                                        {/* PRICING PLANS SECTION */}
+                                        <div style={{ marginBottom: '4rem' }}>
+                                            {/* PLAN SELECTOR */}
+                                            <div style={{
+                                                background: 'var(--bg-card-hover)',
+                                                padding: '6px',
+                                                borderRadius: '16px',
+                                                display: 'inline-flex',
+                                                gap: '4px',
+                                                border: '1px solid var(--accent-light)',
+                                                marginBottom: '2rem',
+                                                boxShadow: '0 4px 15px rgba(0,0,0,0.05)'
+                                            }}>
+                                                {[
+                                                    { id: 'free', label: 'FREE' },
+                                                    { id: 'monthly', label: '30 DÍAS' },
+                                                    { id: 'yearly', label: '1 AÑO' }
+                                                ].map(tab => (
+                                                    <button
+                                                        key={tab.id}
+                                                        onClick={() => setSelectedPlanTab(tab.id)}
+                                                        style={{
+                                                            padding: '10px 24px',
+                                                            borderRadius: '12px',
+                                                            border: 'none',
+                                                            background: selectedPlanTab === tab.id ? '#10B981' : 'transparent',
+                                                            color: selectedPlanTab === tab.id ? 'white' : 'var(--text-secondary)',
+                                                            fontSize: '0.85rem',
+                                                            fontWeight: 800,
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease'
+                                                        }}
+                                                    >
+                                                        {tab.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            {/* PLAN CARD */}
+                                            <div style={{ width: '100%', maxWidth: '500px' }}>
+                                                {selectedPlanTab === 'free' && (
+                                                    <div style={{ background: 'var(--bg-card-hover)', padding: '2rem', borderRadius: '24px', border: '1px solid #10B981', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
+                                                        <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>Prueba Gratis</h3>
+                                                        <div style={{ fontSize: '2.5rem', fontWeight: 900, margin: '1rem 0' }}>$0</div>
+                                                        <button
+                                                            onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Hola,%20quisiera%20solicitar%20mi%20Plan%20Prueba%20Gratis!`, '_blank')}
+                                                            className="btn-primary-gradient"
+                                                            style={{ width: '100%', height: '54px', marginBottom: '1.5rem' }}
+                                                        >
+                                                            Solicitar Prueba
+                                                        </button>
+                                                        <PlanFeatures features={['30 días de acceso', 'Todas las funciones', 'Soporte estándar']} />
+                                                    </div>
+                                                )}
+                                                {selectedPlanTab === 'monthly' && (
+                                                    <div style={{ background: 'var(--text-primary)', color: 'var(--bg-card)', padding: '2.5rem 2rem', borderRadius: '24px', position: 'relative', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+                                                        <div style={{ position: 'absolute', top: '-12px', right: '20px', background: '#f97316', color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>POPULAR</div>
+                                                        <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>Plan Mensual</h3>
+                                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '1rem 0' }}>
+                                                            <span style={{ fontSize: '2.5rem', fontWeight: 900 }}>$10</span>
+                                                            <span style={{ textDecoration: 'line-through', opacity: 0.5 }}>$15</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Hola,%20quisiera%20adquirir%20el%20Plan%20Mensual!`, '_blank')}
+                                                            style={{ width: '100%', height: '54px', background: '#10B981', color: 'white', border: 'none', borderRadius: '14px', fontWeight: 800, cursor: 'pointer', marginBottom: '1.5rem' }}
+                                                        >
+                                                            Suscribirse Ahora
+                                                        </button>
+                                                        <PlanFeatures features={['Sincronización Realtime', 'Multi-dispositivo', 'Soporte Prioritario']} light />
+                                                    </div>
+                                                )}
+                                                {selectedPlanTab === 'yearly' && (
+                                                    <div style={{ background: 'var(--bg-card-hover)', padding: '2rem', borderRadius: '24px', border: '1px solid #10B981', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
+                                                        <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>Plan Anual</h3>
+                                                        <div style={{ fontSize: '2.5rem', fontWeight: 900, margin: '1rem 0' }}>$90</div>
+                                                        <button
+                                                            onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Hola,%20quisiera%20adquirir%20el%20Plan%20Anual!`, '_blank')}
+                                                            className="btn-primary-gradient"
+                                                            style={{ width: '100%', height: '54px', marginBottom: '1.5rem' }}
+                                                        >
+                                                            Adquirir Plan
+                                                        </button>
+                                                        <PlanFeatures features={['Todo el Plan Mensual', '2 Meses Gratis', 'Soporte VIP 24/7']} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* ACTIVATION FORM */}
+                                        {!licenseInfo?.is_active && (
+                                            <div style={{ borderTop: '1px solid var(--accent-light)', paddingTop: '3.5rem', width: '100%', maxWidth: '600px' }}>
+                                                <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '1.5rem', textAlign: isMobile ? 'center' : 'left' }}>¿Ya tienes una clave?</h3>
+                                                <form onSubmit={handleActivate} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="XXXX-XXXX-XXXX-XXXX"
+                                                        value={activationKey}
+                                                        onChange={(e) => setActivationKey(e.target.value.toUpperCase())}
+                                                        className="ticket-input-large"
+                                                        style={{ width: '100%', height: '64px', fontSize: '1.2rem', letterSpacing: '3px', textAlign: 'center', borderRadius: '18px' }}
+                                                    />
+                                                    <button
+                                                        type="submit"
+                                                        disabled={activationStatus.loading || !activationKey}
+                                                        className="btn-primary-gradient"
+                                                        style={{ width: '100%', height: '60px', fontSize: '1.1rem', fontWeight: 900, borderRadius: '18px', boxShadow: '0 10px 20px rgba(255, 140, 0, 0.2)' }}
+                                                    >
+                                                        {activationStatus.loading ? 'ACTIVANDO...' : 'Activar Licencia Ahora'}
+                                                    </button>
+                                                </form>
+                                                {activationStatus.error && <p style={{ color: '#ef4444', fontSize: '0.95rem', marginTop: '1rem', fontWeight: 600, textAlign: 'center' }}>{activationStatus.error}</p>}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
                             </div>
 
-                            <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>
-                                {role === 'DEVELOPER' ? 'Modo Desarrollador' : (licenseInfo?.is_active ? 'Licencia Activa' : 'Activar Producto')}
-                            </h2>
+                            {/* --- RIGHT COLUMN: SIDEBAR STATUS (40%) --- */}
+                            <div style={{
+                                flex: isMobile ? '1' : '0 0 38%',
+                                width: '100%',
+                                position: isMobile ? 'static' : 'sticky',
+                                top: '2rem',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '1.5rem'
+                            }}>
 
-                            <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
-                                {role === 'DEVELOPER'
-                                    ? 'Tienes acceso total e ilimitado a todas las funciones del sistema por ser Administrador de Sistema.'
-                                    : (licenseInfo?.is_active
-                                        ? `Tu licencia ${getPlanLabel(licenseInfo.plan_type)} está funcionando correctamente. Disfruta de todas las funciones.`
-                                        : 'Adquiere un plan para desbloquear la potencia total de tu negocio o ingresa tu clave de producto.')}
-                            </p>
-
-                            {/* PRICING PLANS SECTION */}
-                            {(!licenseInfo?.is_active && isLicenseActive === false) && (
+                                {/* UNIFIED STATUS CARD */}
                                 <div style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '2.5rem',
-                                    marginBottom: '4rem',
-                                    marginTop: '1rem',
-                                    width: '100%'
-                                }}>
-                                    {/* PLAN SELECTOR (Segmented Control) */}
-                                    <div style={{
-                                        background: 'var(--bg-card-hover)',
-                                        padding: '6px',
-                                        borderRadius: '16px',
-                                        display: 'flex',
-                                        gap: '4px',
-                                        border: '1px solid var(--accent-light)',
-                                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-                                    }}>
-                                        {[
-                                            { id: 'free', label: 'FREE' },
-                                            { id: 'monthly', label: '30 DÍAS' },
-                                            { id: 'yearly', label: '1 AÑO' }
-                                        ].map(tab => (
-                                            <button
-                                                key={tab.id}
-                                                onClick={() => setSelectedPlanTab(tab.id)}
-                                                style={{
-                                                    padding: '10px 24px',
-                                                    borderRadius: '12px',
-                                                    border: 'none',
-                                                    background: selectedPlanTab === tab.id ? '#10B981' : 'transparent',
-                                                    color: selectedPlanTab === tab.id ? 'white' : 'var(--text-secondary)',
-                                                    fontSize: '0.85rem',
-                                                    fontWeight: 800,
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                    transform: selectedPlanTab === tab.id ? 'scale(1.05)' : 'scale(1)',
-                                                    boxShadow: selectedPlanTab === tab.id ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
-                                                }}
-                                            >
-                                                {tab.label}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    {/* PLAN CARD CONTAINER */}
-                                    <div style={{ width: '100%', maxWidth: '420px', textAlign: 'left', animation: 'fadeInScale 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }}>
-                                        {/* Plan Prueba */}
-                                        {selectedPlanTab === 'free' && (
-                                            <div style={{
-                                                background: 'var(--bg-card-hover)',
-                                                padding: '2.5rem',
-                                                borderRadius: '32px',
-                                                border: '1px solid #10B981',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '1.5rem',
-                                                boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
-                                            }}>
-                                                <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
-                                                    <Zap size={24} />
-                                                </div>
-                                                <div>
-                                                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>Prueba Gratis</h3>
-                                                    <p style={{ margin: '4px 0 0', fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Para empezar ahora</p>
-                                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '20px' }}>
-                                                        <span style={{ fontSize: '3rem', fontWeight: 900 }}>$0</span>
-                                                    </div>
-                                                    <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>Por 30 días</span>
-                                                </div>
-                                                <button
-                                                    onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Hola,%20quisiera%20solicitar%20mi%20Plan%20Prueba%20Gratis!`, '_blank')}
-                                                    style={{
-                                                        padding: '16px',
-                                                        borderRadius: '16px',
-                                                        border: 'none',
-                                                        background: '#10B981',
-                                                        color: 'white',
-                                                        fontWeight: 800,
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        gap: '10px',
-                                                        fontSize: '1.1rem',
-                                                        boxShadow: '0 6px 20px rgba(16, 185, 129, 0.3)'
-                                                    }}
-                                                >
-                                                    <img src="/Whatsapp.svg" alt="WhatsApp" style={{ width: '22px', height: '22px' }} />
-                                                    Solicitar Prueba
-                                                </button>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
-                                                    {['30 días de acceso', 'Todas las funciones', 'Reportes básicos', 'Soporte estándar'].map((f, i) => (
-                                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem' }}>
-                                                            <CheckCircle2 size={18} color="#10b981" />
-                                                            <span style={{ opacity: 0.8 }}>{f}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Plan Mensual */}
-                                        {selectedPlanTab === 'monthly' && (
-                                            <div style={{
-                                                background: 'var(--text-primary)',
-                                                color: 'var(--bg-card)',
-                                                padding: '3rem 2.5rem',
-                                                borderRadius: '32px',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '1.5rem',
-                                                position: 'relative',
-                                                boxShadow: '0 25px 50px rgba(0,0,0,0.4)',
-                                                border: '1px solid rgba(255,255,255,0.1)'
-                                            }}>
-                                                <div style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', background: '#f97316', color: 'white', padding: '6px 16px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 800, letterSpacing: '0.5px' }}>MÁS POPULAR</div>
-                                                <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg-card)' }}>
-                                                    <Star size={24} />
-                                                </div>
-                                                <div>
-                                                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>Plan Mensual</h3>
-                                                    <p style={{ margin: '4px 0 0', fontSize: '0.95rem', opacity: 0.8 }}>Escalabilidad total</p>
-                                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
-                                                        <span style={{ fontSize: '3rem', fontWeight: 900 }}>$10</span>
-                                                        <span style={{ textDecoration: 'line-through', opacity: 0.5, fontSize: '1.5rem' }}>$15</span>
-                                                        <div style={{ width: '100%', marginTop: '6px' }}>
-                                                            <span style={{ fontSize: '1.3rem', opacity: 1, fontWeight: 800, color: '#f97316' }}>
-                                                                {((exchangeRates.bcv || 0) * 10).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <span style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '8px', display: 'block' }}>Facturación mensual</span>
-                                                </div>
-                                                <button
-                                                    onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Hola,%20quisiera%20adquirir%20el%20Plan%20Mensual!`, '_blank')}
-                                                    style={{
-                                                        padding: '16px',
-                                                        borderRadius: '16px',
-                                                        border: 'none',
-                                                        background: '#10B981',
-                                                        color: 'white',
-                                                        fontWeight: 800,
-                                                        cursor: 'pointer',
-                                                        fontSize: '1.1rem',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        gap: '10px',
-                                                        boxShadow: '0 6px 25px rgba(16, 185, 129, 0.5)'
-                                                    }}
-                                                >
-                                                    <img src="/Whatsapp.svg" alt="WhatsApp" style={{ width: '24px', height: '24px' }} />
-                                                    Suscribirse Ahora
-                                                </button>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
-                                                    {['Sincronización Realtime', 'Multi-dispositivo', 'Soporte Prioritario', 'Backup en la nube'].map((f, i) => (
-                                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem' }}>
-                                                            <CheckCircle2 size={18} color="var(--bg-card)" />
-                                                            <span style={{ opacity: 0.9 }}>{f}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Plan Anual */}
-                                        {selectedPlanTab === 'yearly' && (
-                                            <div style={{
-                                                background: 'var(--bg-card-hover)',
-                                                padding: '2.5rem',
-                                                borderRadius: '32px',
-                                                border: '1px solid #10B981',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '1.5rem',
-                                                boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
-                                            }}>
-                                                <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(234, 88, 12, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f97316' }}>
-                                                    <Trophy size={24} />
-                                                </div>
-                                                <div>
-                                                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>Plan Anual</h3>
-                                                    <p style={{ margin: '4px 0 0', fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Ahorro inteligente</p>
-                                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
-                                                        <span style={{ fontSize: '3rem', fontWeight: 900 }}>$90</span>
-                                                        <span style={{ textDecoration: 'line-through', opacity: 0.5, fontSize: '1.5rem' }}>$120</span>
-                                                        <div style={{ width: '100%', marginTop: '6px' }}>
-                                                            <span style={{ fontSize: '1.3rem', opacity: 1, fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                {((exchangeRates.bcv || 0) * 90).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs
-                                                                <span style={{ fontSize: '0.8rem', fontWeight: 700, background: 'rgba(16, 185, 129, 0.1)', padding: '4px 12px', borderRadius: '8px' }}>AHORRO VALIOSO</span>
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <span style={{ fontSize: '0.9rem', opacity: 0.7, marginTop: '8px', display: 'block' }}>Ahorra 2 meses completos</span>
-                                                </div>
-                                                <button
-                                                    onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Hola,%20quisiera%20adquirir%20el%20Plan%20Anual!`, '_blank')}
-                                                    style={{
-                                                        padding: '16px',
-                                                        borderRadius: '16px',
-                                                        border: 'none',
-                                                        background: '#10B981',
-                                                        color: 'white',
-                                                        fontWeight: 800,
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        gap: '10px',
-                                                        fontSize: '1.1rem',
-                                                        boxShadow: '0 6px 20px rgba(16, 185, 129, 0.3)'
-                                                    }}
-                                                >
-                                                    <img src="/Whatsapp.svg" alt="WhatsApp" style={{ width: '22px', height: '22px' }} />
-                                                    Adquirir Plan
-                                                </button>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
-                                                    {['Todo el Plan Mensual', '2 Meses Gratis Incluidos', 'Soporte VIP 24/7', 'Personalización de Reportes'].map((f, i) => (
-                                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem' }}>
-                                                            <CheckCircle2 size={18} color="#10b981" />
-                                                            <span style={{ opacity: 0.8 }}>{f}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <style jsx>{`
-                                        @keyframes fadeInScale {
-                                            from { opacity: 0; transform: scale(0.95); }
-                                            to { opacity: 1; transform: scale(1); }
-                                        }
-                                    `}</style>
-                                </div>
-                            )}
-                            {/* ACTIVATION FORM */}
-                            {(!licenseInfo?.is_active && isLicenseActive === false) ? (
-                                <div style={{ borderTop: '1px solid var(--accent-light)', paddingTop: '3rem', maxWidth: '400px', margin: '0 auto' }}>
-                                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1.5rem', fontWeight: 700 }}>¿Ya tienes una clave?</h3>
-                                    <form onSubmit={handleActivate} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                                        <div style={{ textAlign: 'left' }}>
-                                            <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', display: 'block' }}>Ingresar Clave de Licencia</label>
-                                            <input
-                                                type="text"
-                                                placeholder="XXXX-XXXX-XXXX-XXXX"
-                                                value={activationKey}
-                                                onChange={(e) => setActivationKey(e.target.value.toUpperCase())}
-                                                className="ticket-input-large"
-                                                style={{
-                                                    textAlign: 'center',
-                                                    letterSpacing: '2px',
-                                                    fontWeight: 'bold',
-                                                    textTransform: 'uppercase',
-                                                    fontSize: '1.25rem',
-                                                    height: '60px',
-                                                    background: 'var(--bg-app)',
-                                                    border: '2px solid var(--accent-light)'
-                                                }}
-                                            />
-                                        </div>
-
-                                        <button
-                                            type="submit"
-                                            disabled={activationStatus.loading || !activationKey}
-                                            className="btn-primary-gradient"
-                                            style={{ height: '60px', fontSize: '1.1rem', fontWeight: 800 }}
-                                        >
-                                            {activationStatus.loading ? 'Verificando...' : 'Activar Licencia Ahora'}
-                                        </button>
-
-                                        {activationStatus.error && (
-                                            <p style={{ color: '#ef4444', fontSize: '0.9rem', marginTop: '0.5rem', fontWeight: 600 }}>
-                                                {activationStatus.error}
-                                            </p>
-                                        )}
-                                    </form>
-                                </div>
-                            ) : (
-                                <div style={{
-                                    background: 'var(--bg-card-hover)',
-                                    padding: isMobile ? '1.5rem 1.25rem' : '2rem',
+                                    background: 'var(--bg-card)',
                                     borderRadius: '24px',
-                                    maxWidth: '450px',
-                                    margin: '0 auto',
+                                    padding: '2rem',
                                     border: '1px solid var(--accent-light)',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+                                    boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
                                 }}>
-                                    <div style={{
-                                        display: 'flex',
-                                        flexDirection: isMobile ? 'column' : 'row',
-                                        justifyContent: 'space-between',
-                                        marginBottom: '1.5rem',
-                                        alignItems: isMobile ? 'flex-start' : 'center',
-                                        gap: isMobile ? '0.75rem' : '0'
-                                    }}>
-                                        <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Estado del Sistema</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>Estado del Sistema</h3>
                                         <span style={{
-                                            color: '#10b981',
-                                            fontWeight: 800,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '6px',
-                                            background: 'rgba(16, 185, 129, 0.1)',
                                             padding: '4px 12px',
-                                            borderRadius: '20px',
-                                            fontSize: isMobile ? '0.85rem' : '1rem'
+                                            borderRadius: '99px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 800,
+                                            background: (licenseInfo?.is_active || licenseInfo?.trialInfo?.isActive || role?.toLowerCase() === 'developer') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                            color: (licenseInfo?.is_active || licenseInfo?.trialInfo?.isActive || role?.toLowerCase() === 'developer') ? '#10b981' : '#ef4444'
                                         }}>
-                                            <CheckCircle2 size={16} /> {role === 'DEVELOPER' ? 'ACCESO VITALICIO' : 'ACTIVO'}
+                                            {(licenseInfo?.is_active || licenseInfo?.trialInfo?.isActive || role?.toLowerCase() === 'developer') ? 'ACTIVO' : 'INACTIVO'}
                                         </span>
                                     </div>
-                                    {role !== 'DEVELOPER' ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                                            {/* Vencimiento */}
-                                            <div style={{
-                                                display: 'flex',
-                                                flexDirection: isMobile ? 'column' : 'row',
-                                                justifyContent: 'space-between',
-                                                paddingBottom: '1rem',
-                                                borderBottom: '1px solid rgba(255,255,255,0.05)',
-                                                alignItems: isMobile ? 'flex-start' : 'center',
-                                                gap: isMobile ? '4px' : '0'
-                                            }}>
-                                                <span style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '0.85rem' : '1rem' }}>Vencimiento</span>
-                                                <span style={{ fontWeight: 700, color: '#f97316', fontSize: isMobile ? '1.1rem' : '1rem', textAlign: 'left' }}>
-                                                    {formatDate(licenseInfo.license_expires_at)}
-                                                </span>
-                                            </div>
 
-                                            {/* Plan Actual */}
-                                            <div style={{
-                                                display: 'flex',
-                                                flexDirection: isMobile ? 'column' : 'row',
-                                                justifyContent: 'space-between',
-                                                paddingBottom: '1rem',
-                                                borderBottom: '1px solid rgba(255,255,255,0.05)',
-                                                alignItems: isMobile ? 'flex-start' : 'center',
-                                                gap: isMobile ? '4px' : '0'
-                                            }}>
-                                                <span style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '0.85rem' : '1rem' }}>Plan Actual</span>
-                                                <span style={{
-                                                    fontWeight: 800,
-                                                    color: licenseInfo.plan_type?.toLowerCase() === 'free' ? '#94a3b8' : '#3b82f6',
-                                                    textTransform: 'uppercase',
-                                                    fontSize: isMobile ? '1.1rem' : '1rem',
-                                                    textAlign: 'left'
-                                                }}>
-                                                    {getPlanLabel(licenseInfo.plan_type)}
-                                                </span>
-                                            </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>Plan Actual</span>
+                                            <span style={{ fontWeight: 800, color: '#3b82f6', fontSize: '1rem' }}>
+                                                {role?.toLowerCase() === 'developer' ? 'DESARROLLADOR' :
+                                                    (licenseInfo?.is_active ? getPlanLabel(licenseInfo.plan_type) :
+                                                        (licenseInfo?.trialInfo?.isActive ? 'PRUEBA 7 DÍAS' : 'NINGUNO'))}
+                                            </span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>Vencimiento</span>
+                                            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                                                {role?.toLowerCase() === 'developer' ? 'NUNCA' :
+                                                    (licenseInfo?.is_active ? new Date(licenseInfo.license_expires_at).toLocaleDateString() :
+                                                        (licenseInfo?.trialInfo?.isActive ? new Date(licenseInfo.trialInfo.expiresAt).toLocaleDateString() : '---'))}
+                                            </span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>Clave Activa</span>
+                                            <code style={{ background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.9rem', color: '#10b981' }}>
+                                                {licenseInfo?.license_key ? `••••${licenseInfo.license_key.slice(-4)}` : '•••• ••••'}
+                                            </code>
+                                        </div>
+                                    </div>
 
-                                            {/* Clave Activa */}
-                                            <div style={{
-                                                display: 'flex',
-                                                flexDirection: isMobile ? 'column' : 'row',
-                                                justifyContent: 'space-between',
-                                                alignItems: isMobile ? 'flex-start' : 'center',
-                                                gap: isMobile ? '8px' : '0'
-                                            }}>
-                                                <span style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '0.85rem' : '1rem' }}>Clave Activa</span>
-                                                <code style={{
-                                                    background: 'rgba(255,255,255,0.05)',
-                                                    padding: '4px 12px',
-                                                    borderRadius: '8px',
-                                                    letterSpacing: '1px',
-                                                    fontSize: isMobile ? '1rem' : '0.9rem',
-                                                    width: isMobile ? '100%' : 'auto',
-                                                    textAlign: 'left',
-                                                    whiteSpace: 'nowrap'
-                                                }}>
-                                                    •••• •••• {licenseInfo?.license_key ? licenseInfo.license_key.slice(-4) : '****'}
-                                                </code>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div style={{ textAlign: 'center', padding: '15px 0', borderTop: '1px solid var(--accent-light)', marginTop: '10px' }}>
-                                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 600 }}>Perfil Master / Desarrollador</span>
-                                        </div>
-                                    )}
+                                    <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--accent-light)', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                                        <AlertCircle size={18} color="var(--text-secondary)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                                            Mantén tu clave segura. No la compartas con nadie para evitar problemas de acceso.
+                                        </p>
+                                    </div>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
                 )
             }
+
             {
                 currentView === 'products' && (
                     <>
@@ -2470,6 +2386,152 @@ export default function SettingsPage() {
                     </>
                 )
             }
-        </div >
+
+            {/* Modal de prueba gratuita */}
+            {
+                showTrialModal && (
+                    <>
+                        <div
+                            onClick={() => setShowTrialModal(false)}
+                            style={{
+                                position: 'fixed',
+                                inset: 0,
+                                background: 'rgba(0, 0, 0, 0.7)',
+                                backdropFilter: 'blur(8px)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 100000,
+                                padding: '1rem',
+                                animation: 'fadeIn 0.2s ease'
+                            }}
+                        >
+                            <div
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                    background: 'var(--bg-card)',
+                                    borderRadius: '24px',
+                                    maxWidth: '500px',
+                                    width: '100%',
+                                    overflow: 'hidden',
+                                    boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+                                    animation: 'bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+                                    border: '1px solid rgba(255, 140, 0, 0.2)'
+                                }}
+                            >
+                                {/* Header con gradiente y rayito */}
+                                <div style={{
+                                    background: 'linear-gradient(135deg, #FF8C00 0%, #FF7900 100%)',
+                                    padding: '1.5rem',
+                                    position: 'relative',
+                                    overflow: 'hidden'
+                                }}>
+                                    <div style={{
+                                        position: 'absolute',
+                                        inset: 0,
+                                        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+                                        backgroundSize: '200% 100%',
+                                        animation: 'shimmer 2s infinite'
+                                    }} />
+
+                                    <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                                        <div style={{
+                                            background: 'rgba(255, 121, 0, 0.2)',
+                                            width: '60px',
+                                            height: '60px',
+                                            borderRadius: '50%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            border: '2px solid rgba(255,255,255,0.4)',
+                                            animation: 'pulse 2s infinite'
+                                        }}>
+                                            <Zap size={32} color="white" fill="white" />
+                                        </div>
+                                        <h3 style={{ margin: 0, color: 'white', fontSize: '1.75rem', fontWeight: 900, textAlign: 'center' }}>Prueba Gratuita</h3>
+                                    </div>
+                                </div>
+
+                                <div style={{ padding: '2rem' }}>
+                                    <p style={{ margin: '0 0 1.5rem 0', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '1.1rem', fontWeight: 500 }}>
+                                        ¡Desbloquea 7 días de acceso total y lleva tu negocio al siguiente nivel!
+                                    </p>
+
+                                    <div className="benefits-modal-grid-settings" style={{
+                                        display: 'grid',
+                                        gap: '1rem',
+                                        marginBottom: '2rem'
+                                    }}>
+                                        <div style={{ background: 'var(--bg-card-hover)', padding: '1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <CheckCircle2 color="#10b981" size={20} />
+                                            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Cuentas Ilimitadas</span>
+                                        </div>
+                                        <div style={{ background: 'var(--bg-card-hover)', padding: '1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <CheckCircle2 color="#10b981" size={20} />
+                                            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Multi-usuario</span>
+                                        </div>
+                                        <div style={{ background: 'var(--bg-card-hover)', padding: '1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <CheckCircle2 color="#10b981" size={20} />
+                                            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Soporte Realtime</span>
+                                        </div>
+                                        <div style={{ background: 'var(--bg-card-hover)', padding: '1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <CheckCircle2 color="#10b981" size={20} />
+                                            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Estadísticas VIP</span>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={handleActivateTrial}
+                                        disabled={isActivating}
+                                        style={{
+                                            width: '100%',
+                                            padding: '1.25rem',
+                                            borderRadius: '16px',
+                                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                            color: 'white',
+                                            border: 'none',
+                                            fontSize: '1.1rem',
+                                            fontWeight: 800,
+                                            cursor: isActivating ? 'not-allowed' : 'pointer',
+                                            boxShadow: '0 10px 20px rgba(16, 185, 129, 0.2)',
+                                            transition: 'all 0.2s ease',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px'
+                                        }}
+                                    >
+                                        <Zap size={20} fill="white" />
+                                        {isActivating ? 'Configurando...' : 'Activar Prueba'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <style>{`
+                            .benefits-modal-grid-settings { grid-template-columns: repeat(2, 1fr); }
+                            @media (max-width: 640px) {
+                                .benefits-modal-grid-settings { grid-template-columns: 1fr; }
+                            }
+                            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                            @keyframes bounceIn {
+                                0% { transform: scale(0.3); opacity: 0; }
+                                50% { transform: scale(1.05); }
+                                70% { transform: scale(0.9); }
+                                100% { transform: scale(1); opacity: 1; }
+                            }
+                            @keyframes shimmer {
+                                0% { background-position: -200% center; }
+                                100% { background-position: 200% center; }
+                            }
+                            @keyframes pulse {
+                                0%, 100% { transform: scale(1); }
+                                50% { transform: scale(1.05); }
+                            }
+                        `}</style>
+                    </>
+                )
+            }
+        </div>
     );
-}
+};

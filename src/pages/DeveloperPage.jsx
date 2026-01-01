@@ -36,7 +36,7 @@ export default function DeveloperPage() {
     }, []);
 
     useEffect(() => {
-        if (!loading && role !== 'DEVELOPER') {
+        if (!loading && role?.toLowerCase() !== 'developer') {
             navigate('/');
         }
     }, [role, loading, navigate]);
@@ -113,7 +113,7 @@ export default function DeveloperPage() {
     };
 
     useEffect(() => {
-        if (role === 'DEVELOPER') {
+        if (role?.toLowerCase() === 'developer') {
             fetchEvents();
             fetchKeys();
             checkMfaStatus();
@@ -858,6 +858,29 @@ export default function DeveloperPage() {
                                                 {copiedId === k.id ? <CheckCircle2 size={16} /> : <Copy size={16} />}
                                                 {copiedId === k.id ? 'Copiado' : 'Copiar'}
                                             </button>
+                                            {k.status === 'available' && (
+                                                <button
+                                                    onClick={() => handleShareLink(k)}
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '10px',
+                                                        borderRadius: '10px',
+                                                        border: '1px solid var(--accent-light)',
+                                                        background: copiedId === k.id + '_link' ? 'rgba(16, 185, 129, 0.2)' : 'var(--bg-card-hover)',
+                                                        color: copiedId === k.id + '_link' ? '#10b981' : 'var(--text-primary)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '8px',
+                                                        fontWeight: 600,
+                                                        fontSize: '0.85rem',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    {copiedId === k.id + '_link' ? <CheckCircle2 size={16} /> : <ExternalLink size={16} />}
+                                                    {copiedId === k.id + '_link' ? 'Link!' : 'Link'}
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => deleteKey(k.id)}
                                                 style={{

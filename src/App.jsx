@@ -38,11 +38,11 @@ function App() {
   return (
     <AuthProvider>
       <NotificationProvider>
-        <AuthListener />
         <ThemeProvider>
           <ProductProvider>
             <OrderProvider>
               <BrowserRouter>
+                <AuthListener />
                 <AnalyticsProvider>
                   <ScrollToTop />
                   <NotificationToast />

@@ -8,7 +8,7 @@ export function AuthProvider({ children }) {
     const [role, setRole] = useState(null); // 'master', 'admin', 'employee', 'normal'
     const [organizationId, setOrganizationId] = useState(null);
     const [organizationName, setOrganizationName] = useState(null);
-    const [isLicenseActive, setIsLicenseActive] = useState(true); // Default to true to prevent flickering, then check
+    const [isLicenseActive, setIsLicenseActive] = useState(false); // Default to false until verified
     const [planType, setPlanType] = useState(null); // 'free', 'monthly', 'yearly'
     const [licenseExpiresAt, setLicenseExpiresAt] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -73,21 +73,20 @@ export function AuthProvider({ children }) {
                         setPlanType(org.plan_type);
                         setLicenseExpiresAt(org.license_expires_at);
 
-                        // Check if license is active AND not expired
                         const isActive = org.is_active === true;
                         const expiryDate = org.license_expires_at ? new Date(org.license_expires_at) : null;
                         const isExpired = expiryDate ? expiryDate < new Date() : false;
 
-                        // ⭐ NUEVO: Verificar si está en período de prueba de 7 días
+                        // Verificar si está en período de prueba de 7 días
                         const trialStarted = org.trial_started_at ? new Date(org.trial_started_at) : null;
                         const trialEnds = trialStarted ? new Date(trialStarted.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
-                        const isInTrial = trialStarted && trialEnds && new Date() < trialEnds && !isActive;
+                        const isInTrial = !!(trialStarted && trialEnds && new Date() < trialEnds && !isActive);
 
-                        // Usuario tiene acceso si:
-                        // 1. Es developer, O
-                        // 2. Tiene licencia activa y no expirada, O
-                        // 3. Está en período de prueba de 7 días
-                        setIsLicenseActive(isDev || (isActive && !isExpired) || isInTrial);
+                        // Seguridad adicional: si no hay plan y no es trial, no puede estar activa
+                        const hasValidPlan = org.plan_type !== null;
+
+                        const finalIsActive = isDev || ((isActive && !isExpired && hasValidPlan) || isInTrial);
+                        setIsLicenseActive(finalIsActive);
                     } else {
                         console.error('Error fetching org name:', orgError);
                         setOrganizationName('Desconocida');

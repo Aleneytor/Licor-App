@@ -102,7 +102,14 @@ export default function InventoryFab() {
 
     // Auto-focus helper for inputs?
     const handleCostChange = (key, val) => {
-        setCostInputs(prev => ({ ...prev, [key]: val }));
+        // Ensure only numbers and decimal point
+        const numericVal = val.replace(/[^0-9.]/g, '');
+        // Limit to 2 decimal places
+        const parts = numericVal.split('.');
+        if (parts.length > 2) return;
+        if (parts[1] && parts[1].length > 2) return;
+
+        setCostInputs(prev => ({ ...prev, [key]: numericVal }));
     };
 
     const handleClose = () => {
@@ -214,15 +221,34 @@ export default function InventoryFab() {
                                             <div style={{ flex: 1, position: 'relative' }}>
                                                 <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', fontWeight: 600 }}>$</span>
                                                 <input
-                                                    type="number"
+                                                    type="text"
+                                                    inputMode="decimal"
                                                     value={costInputs[key] || ''}
                                                     onChange={(e) => handleCostChange(key, e.target.value)}
                                                     placeholder="0.00"
                                                     style={{
-                                                        width: '100%', padding: '10px 10px 10px 24px', borderRadius: '10px',
-                                                        border: '1px solid var(--border-color)', outline: 'none',
-                                                        background: 'var(--bg-card)', color: 'var(--text-primary)',
-                                                        fontWeight: 700, fontSize: '1rem'
+                                                        width: '100%',
+                                                        padding: '12px 12px 12px 28px',
+                                                        borderRadius: '16px',
+                                                        border: '2px solid var(--border-color)',
+                                                        outline: 'none',
+                                                        background: 'rgba(128, 128, 128, 0.08)',
+                                                        color: 'var(--text-primary)',
+                                                        fontWeight: 800,
+                                                        fontSize: '1.2rem',
+                                                        transition: 'all 0.2s ease',
+                                                        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)',
+                                                        cursor: 'text'
+                                                    }}
+                                                    onFocus={(e) => {
+                                                        e.target.style.borderColor = '#10b981';
+                                                        e.target.style.boxShadow = '0 0 0 4px rgba(16, 185, 129, 0.15)';
+                                                        e.target.style.background = 'var(--bg-card)';
+                                                    }}
+                                                    onBlur={(e) => {
+                                                        e.target.style.borderColor = 'var(--border-color)';
+                                                        e.target.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.05)';
+                                                        e.target.style.background = 'rgba(128, 128, 128, 0.08)';
                                                     }}
                                                 />
                                             </div>

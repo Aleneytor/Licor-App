@@ -202,7 +202,13 @@ export default function StockManager() {
     // Merge History for the big modal
     const safeInvHistory = Array.isArray(inventoryHistory) ? inventoryHistory : [];
     const safeBreakHistory = Array.isArray(breakageHistory) ? breakageHistory : [];
-    const allHistory = [...safeInvHistory, ...safeBreakHistory].sort((a, b) => b.id - a.id);
+
+    // Combine and sort by date (actual date objects or strings)
+    const allHistory = [...safeInvHistory, ...safeBreakHistory].sort((a, b) => {
+        const dateA = new Date(a.created_at || a.timestamp);
+        const dateB = new Date(b.created_at || b.timestamp);
+        return dateB - dateA;
+    });
 
     // Recent Waste for the footer section
     const recentWaste = safeBreakHistory.slice(0, 5);

@@ -157,10 +157,20 @@ export const ProductProvider = ({ children }) => {
 
                 // 8. History (Inventory & Waste)
                 const { data: invHist } = await fetchInventoryHistory(organizationId);
-                if (invHist) setInventoryHistory(invHist.slice(0, 50));
+                const mappedInvHist = (invHist || []).map(h => ({
+                    ...h,
+                    type: 'INVENTORY',
+                    timestamp: h.created_at ? new Date(h.created_at).toLocaleString() : '---'
+                }));
+                setInventoryHistory(mappedInvHist.slice(0, 50));
 
                 const { data: wasteHist } = await fetchWasteReports(organizationId);
-                if (wasteHist) setBreakageHistory(wasteHist.slice(0, 50));
+                const mappedWasteHist = (wasteHist || []).map(h => ({
+                    ...h,
+                    type: 'WASTE',
+                    timestamp: h.created_at ? new Date(h.created_at).toLocaleString() : '---'
+                }));
+                setBreakageHistory(mappedWasteHist.slice(0, 50));
 
             } catch (error) {
                 console.error("Error fetching initial data:", error);
@@ -279,6 +289,30 @@ export const ProductProvider = ({ children }) => {
                     if (payload.new.key === 'exchangeRates') setExchangeRates(payload.new.value);
                     if (payload.new.key === 'subtypes') setSubtypes(payload.new.value);
                 }
+            })
+            // INVENTORY HISTORY
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inventory_history', filter: `organization_id=eq.${organizationId}` }, (payload) => {
+                const report = {
+                    ...payload.new,
+                    type: 'INVENTORY',
+                    timestamp: new Date(payload.new.created_at).toLocaleString()
+                };
+                setInventoryHistory(prev => {
+                    if (prev.some(h => h.id === report.id)) return prev;
+                    return [report, ...prev].slice(0, 50);
+                });
+            })
+            // WASTE REPORTS
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'waste_reports', filter: `organization_id=eq.${organizationId}` }, (payload) => {
+                const report = {
+                    ...payload.new,
+                    type: 'WASTE',
+                    timestamp: new Date(payload.new.created_at).toLocaleString()
+                };
+                setBreakageHistory(prev => {
+                    if (prev.some(h => h.id === report.id)) return prev;
+                    return [report, ...prev].slice(0, 50);
+                });
             })
             .subscribe();
 
@@ -797,11 +831,24 @@ export const ProductProvider = ({ children }) => {
             movements.push({ beer, subtype, emission, quantity, totalUnits });
         }
 
-        const report = { organization_id: organizationId, movements, total_units: totalCount };
-        if (organizationId) await createInventoryHistory(report);
+        const report = {
+            organization_id: organizationId,
+            movements,
+            total_units: totalCount,
+            type: 'INVENTORY',
+            timestamp
+        };
 
-        setInventoryHistory(prev => [{ ...report, created_at: timestamp }, ...prev].slice(0, 50));
+        if (organizationId) {
+            // Filter out UI-only fields
+            const { type, timestamp: _, ...dbPayload } = report;
+            const { data } = await createInventoryHistory(dbPayload);
+            if (data) report.id = data.id;
+        }
+
+        setInventoryHistory(prev => [report, ...prev].slice(0, 50));
         setPendingInventory({});
+        return report;
     };
 
     const commitWaste = async () => {
@@ -820,11 +867,24 @@ export const ProductProvider = ({ children }) => {
             movements.push({ beer, subtype, emission, quantity, totalUnits });
         }
 
-        const report = { organization_id: organizationId, movements, total_units: totalCount };
-        if (organizationId) await createWasteReport(report);
+        const report = {
+            organization_id: organizationId,
+            movements,
+            total_units: totalCount,
+            type: 'WASTE',
+            timestamp
+        };
 
-        setBreakageHistory(prev => [{ ...report, created_at: timestamp }, ...prev].slice(0, 50));
+        if (organizationId) {
+            // Filter out UI-only fields
+            const { type, timestamp: _, ...dbPayload } = report;
+            const { data } = await createWasteReport(dbPayload);
+            if (data) report.id = data.id;
+        }
+
+        setBreakageHistory(prev => [report, ...prev].slice(0, 50));
         setPendingWaste({});
+        return report;
     };
 
     const reportWaste = async (beer, subtype, quantity) => {
@@ -833,10 +893,12 @@ export const ProductProvider = ({ children }) => {
         const report = {
             organization_id: organizationId,
             movements: [{ beer, subtype, emission: 'Unidad', quantity: totalUnits, totalUnits }],
-            total_units: totalUnits
+            total_units: totalUnits,
+            type: 'WASTE',
+            timestamp: new Date().toLocaleString()
         };
         if (organizationId) await createWasteReport(report);
-        setBreakageHistory(prev => [{ ...report, created_at: new Date().toISOString() }, ...prev].slice(0, 50));
+        setBreakageHistory(prev => [report, ...prev].slice(0, 50));
         showNotification(`Reportada Merma: ${quantity} ${beer}`, 'warning');
     };
 

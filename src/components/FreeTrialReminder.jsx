@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { Clock, X, Zap, AlertTriangle } from 'lucide-react';
@@ -13,6 +13,12 @@ const DISMISS_KEY = 'freeTrialReminderDismissedUntil';
 export default function FreeTrialReminder() {
     const { planType, licenseExpiresAt, isLicenseActive, role, organizationId } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // NUEVO: Ocultar si estamos en el menú de activación
+    const params = new URLSearchParams(location.search);
+    const isActivationView = params.get('view') === 'activation';
+
     const [dismissed, setDismissed] = useState(() => {
         // Verificar si fue dismisseado hoy
         const dismissedUntil = localStorage.getItem(DISMISS_KEY);
@@ -86,7 +92,7 @@ export default function FreeTrialReminder() {
     // 1. Está en trial de 7 días (isInTrial = true), O
     // 2. Tiene plan free con expiración, O
     // 3. NO tiene licencia activa y NO está en trial (para poder activar trial)
-    const shouldShow = !isDeveloper && !dismissed && (
+    const shouldShow = !isDeveloper && !dismissed && !isActivationView && (
         (isInTrial && daysLeft !== null) ||  // Tiene trial activo
         (isFree && isLicenseActive && daysLeft !== null) || // Tiene plan free
         (!isLicenseActive && !isInTrial) // NO tiene licencia NI trial
@@ -101,8 +107,8 @@ export default function FreeTrialReminder() {
     const isWarning = daysLeft !== null && daysLeft <= 7 && daysLeft > 3;
 
     const getProgressColor = () => {
-        if (isUrgent) return '#ef4444'; // Rojo
-        if (isWarning) return '#f59e0b'; // Naranja
+        if (isUrgent) return '#ef4444'; // Rojo urgent
+        if (isWarning || daysLeft === null || daysLeft <= 0) return '#FA852B'; // Naranja de marca (ahora también para restringido)
         return '#3b82f6'; // Azul
     };
 
@@ -116,11 +122,12 @@ export default function FreeTrialReminder() {
 
     const getIcon = () => {
         if (isUrgent) return AlertTriangle;
+        if (daysLeft === null || daysLeft <= 0) return AlertTriangle;
         return Clock;
     };
 
     const Icon = getIcon();
-    const progressPercent = Math.max(0, Math.min(100, ((30 - daysLeft) / 30) * 100));
+    const progressPercent = daysLeft === null || daysLeft <= 0 ? 100 : Math.max(0, Math.min(100, ((30 - daysLeft) / 30) * 100));
 
     // Detectar si es móvil
     const isMobile = window.innerWidth < 640;
@@ -129,16 +136,16 @@ export default function FreeTrialReminder() {
         <div style={{
             background: isUrgent
                 ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%)'
-                : isWarning
-                    ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%)'
+                : (isWarning || daysLeft === null || daysLeft <= 0)
+                    ? 'linear-gradient(135deg, rgba(250, 133, 43, 0.15) 0%, rgba(250, 133, 43, 0.1) 100%)'
                     : 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.1) 100%)',
-            border: `1px solid ${isUrgent ? 'rgba(239, 68, 68, 0.3)' : isWarning ? 'rgba(245, 158, 11, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
+            border: `1px solid ${isUrgent ? 'rgba(239, 68, 68, 0.3)' : (isWarning || daysLeft === null || daysLeft <= 0) ? 'rgba(250, 133, 43, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
             borderRadius: isMobile ? '12px' : '16px',
             padding: isMobile ? '10px 12px' : '12px 16px',
             marginBottom: '1rem',
             position: 'relative',
             overflow: 'hidden',
-            animation: isUrgent ? 'pulseUrgent 2s ease-in-out infinite' : 'none'
+            animation: (isUrgent || daysLeft === null || daysLeft <= 0) ? 'pulseUrgent 2s ease-in-out infinite' : 'none'
         }}>
             {/* Barra de progreso */}
             <div style={{
@@ -154,10 +161,11 @@ export default function FreeTrialReminder() {
 
             <div style={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: isMobile ? 'flex-start' : 'center',
                 justifyContent: 'space-between',
                 gap: isMobile ? '8px' : '12px',
-                flexWrap: isMobile ? 'nowrap' : 'nowrap'
+                flexDirection: isMobile ? 'column' : 'row',
+                width: '100%'
             }}>
                 {/* Icono y mensaje */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '10px', flex: 1, minWidth: 0 }}>
@@ -207,41 +215,38 @@ export default function FreeTrialReminder() {
                 </div>
 
                 {/* Botones */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '8px' : '10px', width: '100%', marginTop: isMobile ? '0.5rem' : '0' }}>
+                <div style={{
+                    display: 'flex',
+                    flexDirection: isMobile ? 'column' : 'row',
+                    gap: isMobile ? '8px' : '10px',
+                    width: isMobile ? '100%' : 'auto',
+                    flexShrink: 0
+                }}>
                     {/* Botón Principal: Probar 7 Días (solo si NO está en trial) */}
                     {!isInTrial && (
                         <button
                             onClick={() => setShowTrialModal(true)}
                             style={{
-                                background: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
+                                background: 'linear-gradient(135deg, #FF8C00 0%, #FF7900 100%)',
                                 color: 'white',
                                 border: 'none',
-                                borderRadius: isMobile ? '12px' : '16px',
-                                padding: isMobile ? '10px 14px' : '12px 18px',
-                                fontSize: isMobile ? '0.85rem' : '1rem',
+                                borderRadius: isMobile ? '10px' : '12px',
+                                padding: isMobile ? '10px 16px' : '10px 20px',
+                                fontSize: isMobile ? '0.85rem' : '0.9rem',
                                 fontWeight: 700,
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'space-between',
-                                boxShadow: '0 4px 16px rgba(249, 115, 22, 0.4)',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                boxShadow: '0 4px 16px rgba(255, 140, 0, 0.4)',
                                 transition: 'all 0.2s ease',
-                                position: 'relative',
-                                overflow: 'hidden'
+                                whiteSpace: 'nowrap',
+                                flex: isMobile ? '1' : '0 0 auto'
                             }}
                         >
-                            <span style={{ flex: 1, textAlign: 'left' }}>Probar 7 Días</span>
-                            <div style={{
-                                background: 'white',
-                                color: '#F97316',
-                                padding: isMobile ? '4px 10px' : '6px 14px',
-                                borderRadius: '8px',
-                                fontSize: isMobile ? '0.7rem' : '0.8rem',
-                                fontWeight: 800,
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                            }}>
-                                Gratis
-                            </div>
+                            <Zap size={isMobile ? 16 : 18} fill="white" />
+                            Probar 7 Días
                         </button>
                     )}
 
@@ -257,20 +262,22 @@ export default function FreeTrialReminder() {
                             background: '#10B981',
                             color: 'white',
                             border: 'none',
-                            borderRadius: isMobile ? '12px' : '16px',
-                            padding: isMobile ? '10px 14px' : '12px 18px',
-                            fontSize: isMobile ? '0.85rem' : '1rem',
+                            borderRadius: isMobile ? '10px' : '12px',
+                            padding: isMobile ? '10px 16px' : '10px 20px',
+                            fontSize: isMobile ? '0.85rem' : '0.9rem',
                             fontWeight: 700,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: isMobile ? '8px' : '10px',
+                            gap: isMobile ? '6px' : '8px',
                             boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)',
-                            transition: 'all 0.2s ease'
+                            transition: 'all 0.2s ease',
+                            whiteSpace: 'nowrap',
+                            flex: isMobile ? '1' : '0 0 auto'
                         }}
                     >
-                        <img src="/Whatsapp.svg" alt="WhatsApp" style={{ width: isMobile ? '18px' : '20px', height: isMobile ? '18px' : '20px' }} />
+                        <img src="/Whatsapp.svg" alt="WhatsApp" style={{ width: isMobile ? '16px' : '18px', height: isMobile ? '16px' : '18px' }} />
                         Activar Ahora
                     </button>
                 </div>
@@ -321,12 +328,12 @@ export default function FreeTrialReminder() {
                             overflow: 'hidden',
                             boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
                             animation: 'bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-                            border: '1px solid rgba(249, 115, 22, 0.2)'
+                            border: '1px solid rgba(255, 140, 0, 0.2)'
                         }}
                     >
                         {/* Header con gradiente y rayito */}
                         <div style={{
-                            background: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
+                            background: 'linear-gradient(135deg, #FF8C00 0%, #FF7900 100%)',
                             padding: '2rem 1.5rem',
                             position: 'relative',
                             overflow: 'hidden'
@@ -484,12 +491,12 @@ export default function FreeTrialReminder() {
                                         padding: '14px',
                                         borderRadius: '12px',
                                         border: 'none',
-                                        background: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
+                                        background: 'linear-gradient(135deg, #FF8C00 0%, #FF7900 100%)',
                                         color: 'white',
                                         fontSize: '1rem',
                                         fontWeight: 800,
                                         cursor: 'pointer',
-                                        boxShadow: '0 4px 16px rgba(249, 115, 22, 0.4)',
+                                        boxShadow: '0 4px 16px rgba(255, 140, 0, 0.4)',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
