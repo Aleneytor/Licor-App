@@ -1,23 +1,28 @@
 import React, { useState, useEffect } from 'react';
-// import { supabase } from '../supabaseClient';
-import { useNavigate } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { UserCheck, Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function CompleteRegistration() {
     const navigate = useNavigate();
-    const { user, signOut } = useAuth(); // User should be logged in via Magic Link
+    const [searchParams] = useSearchParams();
+    const { user } = useAuth(); // User should be logged in via Magic Link
     const [fullName, setFullName] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        // If no user is found after a short delay (auth state loading), we might want to redirect to login.
-        // For now, we assume useAuth handles the initial load.
-        // If user is already fully set up (has password?), technically they could reuse this page to reset, but let's assume it's for new invites.
+    // Get organization details from URL params
+    const orgId = searchParams.get('org_id');
+    const role = searchParams.get('role') || 'EMPLOYEE';
+    const orgName = searchParams.get('org_name') || 'Organización';
 
-        // Try to pre-fill name if available (unlikely for magic link invite)
+    useEffect(() => {
+        // Pre-fill name from user metadata if available
+        if (user?.user_metadata?.full_name) {
+            setFullName(user.user_metadata.full_name);
+        }
     }, [user]);
 
     const handleComplete = async (e) => {
@@ -25,15 +30,10 @@ export default function CompleteRegistration() {
         setLoading(true);
         setError('');
 
-        // MOCK COMPLETE
-        setTimeout(() => {
-            alert('¡Cuenta configurada con éxito!');
-            navigate('/');
-        }, 1000);
-
-        /*
         try {
             if (!user) throw new Error("No hay sesión activa. Por favor usa el enlace de tu correo nuevamente.");
+
+            if (!orgId) throw new Error("Información de organización no encontrada. Por favor contacta al administrador.");
 
             // 1. Update Password
             const { error: passError } = await supabase.auth.updateUser({
@@ -41,26 +41,32 @@ export default function CompleteRegistration() {
             });
             if (passError) throw passError;
 
-            // 2. Update Profile Name
+            // 2. Update Profile Name and link to organization
             const { error: profileError } = await supabase
                 .from('profiles')
-                .update({ full_name: fullName })
+                .update({
+                    full_name: fullName,
+                    organization_id: orgId,
+                    role: role.toLowerCase()
+                })
                 .eq('id', user.id);
 
             if (profileError) {
-                console.warn("Error actualizando nombre:", profileError);
-                // Non-blocking error, but good to know
+                console.error("Error actualizando perfil:", profileError);
+                throw new Error("Error al actualizar el perfil. Por favor intenta nuevamente.");
             }
 
-            // 3. Delete the invite (Consume it) - Optional cleanup
-            // We can delete by email
+            // 3. Mark invite as accepted by updating status
             await supabase
                 .from('organization_invites')
-                .delete()
-                .eq('email', user.email);
+                .update({ status: 'accepted' })
+                .eq('email', user.email)
+                .eq('organization_id', orgId);
 
-            alert('¡Cuenta configurada con éxito!');
-            navigate('/'); // Go to dashboard
+            alert(`¡Cuenta configurada con éxito! Ahora eres parte de ${decodeURIComponent(orgName)}`);
+
+            // Reload to update auth context with new organization and role
+            window.location.href = '/';
 
         } catch (err) {
             console.error(err);
@@ -68,7 +74,6 @@ export default function CompleteRegistration() {
         } finally {
             setLoading(false);
         }
-        */
     };
 
     return (

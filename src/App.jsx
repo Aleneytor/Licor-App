@@ -8,6 +8,7 @@ import SettingsPage from './pages/SettingsPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import CompleteRegistration from './pages/CompleteRegistration';
+import RegistroEmpleado from './pages/RegistroEmpleado';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import DeveloperPage from './pages/DeveloperPage';
@@ -55,6 +56,7 @@ function App() {
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/complete-registration" element={<CompleteRegistration />} />
+                    <Route path="/registro-empleado" element={<RegistroEmpleado />} />
                     <Route path="/activar/:token" element={<ActivateLicense />} />
 
                     {/* Protected Routes */}

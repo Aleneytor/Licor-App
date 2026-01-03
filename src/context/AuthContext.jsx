@@ -15,41 +15,61 @@ export function AuthProvider({ children }) {
 
     // Initial Session Check
     useEffect(() => {
+        let isMounted = true;
+
         // Check active session
         supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session) {
+            if (isMounted && session) {
                 fetchProfile(session.user);
-            } else {
+            } else if (isMounted) {
                 setLoading(false);
             }
         });
 
         // Listen for changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (!isMounted) return;
+
             if (session) {
                 fetchProfile(session.user);
             } else {
                 setUser(null);
                 setRole(null);
                 setOrganizationId(null);
+                setOrganizationName(null);
+                setIsLicenseActive(false);
                 setLoading(false);
             }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     const fetchProfile = async (currentUser) => {
         try {
-            // 1. Fetch Profile
+            // UNA SOLA query con JOIN para traer perfil + organización
             const { data: profile, error: profileError } = await supabase
                 .from('profiles')
-                .select('*')
+                .select(`
+                    *,
+                    organizations (
+                        name,
+                        is_active,
+                        license_expires_at,
+                        plan_type,
+                        trial_started_at
+                    )
+                `)
                 .eq('id', currentUser.id)
                 .single();
 
             if (profileError) {
                 console.error('Error fetching profile:', profileError);
+                setLoading(false);
+                return;
             }
 
             setUser(currentUser);
@@ -58,51 +78,36 @@ export function AuthProvider({ children }) {
                 setRole(profile.role);
                 setOrganizationId(profile.organization_id);
 
-                // 2. Fetch Organization Name (Separate Query to avoid RLS recursion)
-                if (profile.organization_id) {
-                    const { data: org, error: orgError } = await supabase
-                        .from('organizations')
-                        .select('name, is_active, license_expires_at, plan_type, trial_started_at')
-                        .eq('id', profile.organization_id)
-                        .single();
+                const org = profile.organizations;
+                const isDev = profile.role?.toUpperCase() === 'DEVELOPER';
 
-                    const isDev = profile.role?.toUpperCase() === 'DEVELOPER';
+                if (org) {
+                    setOrganizationName(org.name);
+                    setPlanType(org.plan_type);
+                    setLicenseExpiresAt(org.license_expires_at);
 
-                    if (!orgError && org) {
-                        setOrganizationName(org.name);
-                        setPlanType(org.plan_type);
-                        setLicenseExpiresAt(org.license_expires_at);
+                    const isActive = org.is_active === true;
+                    const expiryDate = org.license_expires_at ? new Date(org.license_expires_at) : null;
+                    const isExpired = expiryDate ? expiryDate < new Date() : false;
 
-                        const isActive = org.is_active === true;
-                        const expiryDate = org.license_expires_at ? new Date(org.license_expires_at) : null;
-                        const isExpired = expiryDate ? expiryDate < new Date() : false;
+                    const trialStarted = org.trial_started_at ? new Date(org.trial_started_at) : null;
+                    const trialEnds = trialStarted ? new Date(trialStarted.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+                    const isInTrial = !!(trialStarted && trialEnds && new Date() < trialEnds && !isActive);
 
-                        // Verificar si está en período de prueba de 7 días
-                        const trialStarted = org.trial_started_at ? new Date(org.trial_started_at) : null;
-                        const trialEnds = trialStarted ? new Date(trialStarted.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
-                        const isInTrial = !!(trialStarted && trialEnds && new Date() < trialEnds && !isActive);
-
-                        // Seguridad adicional: si no hay plan y no es trial, no puede estar activa
-                        const hasValidPlan = org.plan_type !== null;
-
-                        const finalIsActive = isDev || ((isActive && !isExpired && hasValidPlan) || isInTrial);
-                        setIsLicenseActive(finalIsActive);
-                    } else {
-                        console.error('Error fetching org name:', orgError);
-                        setOrganizationName('Desconocida');
-                        setPlanType(null);
-                        setLicenseExpiresAt(null);
-                        setIsLicenseActive(isDev);
-                    }
+                    const hasValidPlan = org.plan_type !== null;
+                    const finalIsActive = isDev || ((isActive && !isExpired && hasValidPlan) || isInTrial);
+                    setIsLicenseActive(finalIsActive);
                 } else {
-                    // No org, but check if dev
-                    setIsLicenseActive(profile.role?.toUpperCase() === 'DEVELOPER');
+                    setOrganizationName(null);
+                    setPlanType(null);
+                    setLicenseExpiresAt(null);
+                    setIsLicenseActive(isDev);
                 }
             } else {
                 console.warn('No profile found for user');
             }
         } catch (err) {
-            console.error(err);
+            console.error('Error in fetchProfile:', err);
         } finally {
             setLoading(false);
         }

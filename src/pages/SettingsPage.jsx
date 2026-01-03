@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useProduct } from '../context/ProductContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
 import { supabase } from '../supabaseClient';
-import { Trash2, Plus, Save, ChevronRight, ChevronLeft, CircleDollarSign, Users, Package, Star, Box, Send, LogOut, Moon, Sun, Store, ShoppingBag, Search, ChevronDown, ChevronUp, X, Pencil, Check, ShieldCheck, Key, Zap, Trophy, CheckCircle2, AlertCircle, MessageCircle } from 'lucide-react';
+import { Trash2, Plus, Save, ChevronRight, ChevronLeft, CircleDollarSign, Users, Package, Star, Box, Send, LogOut, Moon, Sun, Store, ShoppingBag, Search, ChevronDown, ChevronUp, X, Pencil, Check, ShieldCheck, Key, Zap, Trophy, CheckCircle2, AlertCircle, MessageCircle, Copy, Link, Mail } from 'lucide-react';
 import AccordionSection from '../components/AccordionSection';
 import StockManager from '../components/StockManager';
 import ContainerSelector from '../components/ContainerSelector';
@@ -131,22 +131,28 @@ const BeerDashboardCard = ({ beerName, searchFilter = '' }) => {
     useEffect(() => {
         if (beerName === 'Tercio') {
             setSubtype('Botella Tercio');
+        }
+    }, [beerName]); // Solo cuando cambia el nombre de la cerveza
+
+    useEffect(() => {
+        if (!normalizedQuery || normalizedQuery.length < 2) {
+            setIsExpanded(false);
             return;
         }
 
-        if (!normalizedQuery) return;
-
-        // Auto-expand ONLY if it's a strong match (Name match 80+, or Emission match 70+)
+        // Auto-expand solo con match fuerte
         if (searchScore >= 70) {
             setIsExpanded(true);
         }
 
+        // Cambiar subtype basado en búsqueda
         if (isFuzzyMatch('lata', normalizedQuery) || normalizedQuery.includes('lata')) {
             setSubtype(prev => prev.includes('Lata') ? prev : 'Lata Pequeña');
         } else if (isFuzzyMatch('botella', normalizedQuery) || normalizedQuery.includes('botella')) {
             setSubtype('Botella');
         }
-    }, [normalizedQuery, searchScore]);
+    }, [normalizedQuery, searchScore]); // Solo cuando cambia la búsqueda o el score
+
 
     // 5. Filtered Emissions for Display
     const filteredEmissions = allActiveEmissions.filter(emission => {
@@ -823,8 +829,9 @@ export default function SettingsPage() {
     };
 
     // Local State
-    const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState('EMPLOYEE');
+    const [generatedInviteLink, setGeneratedInviteLink] = useState('');
+    const [showInviteLinkModal, setShowInviteLinkModal] = useState(false);
     const [isEditingCustomRate, setIsEditingCustomRate] = useState(false);
     const [draftCustomRate, setDraftCustomRate] = useState('');
     const [inviteStatus, setInviteStatus] = useState('');
@@ -840,6 +847,58 @@ export default function SettingsPage() {
     const WHATSAPP_NUMBER = "584220131019";
 
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    // --- Team Management Logic ---
+    const [teamMembers, setTeamMembers] = useState([]);
+    const [loadingMembers, setLoadingMembers] = useState(false);
+
+    // Fetch Team Members
+    const fetchTeamMembers = async () => {
+        if (!organizationId) return;
+        setLoadingMembers(true);
+        try {
+            // Fetch ALL profiles in org
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('organization_id', organizationId);
+
+            if (error) throw error;
+
+            // Filter out current user for the list, but keep data if needed
+            setTeamMembers(data.filter(m => m.id !== user.id) || []);
+        } catch (err) {
+            console.error('Error fetching team:', err);
+            // Don't show error on first load to avoid spam if permissions aren't ready
+        } finally {
+            setLoadingMembers(false);
+        }
+    };
+
+    // Load team when viewing 'users'
+    useEffect(() => {
+        if (currentView === 'users' && organizationId) {
+            fetchTeamMembers();
+        }
+    }, [currentView, organizationId]);
+
+    // Delete Member Logic
+    const handleDeleteMember = async (memberId) => {
+        if (!window.confirm("¿Estás seguro de que quieres eliminar a este usuario? Esta acción borrará su cuenta permanentemente.")) return;
+
+        try {
+            const { error } = await supabase.rpc('delete_team_member', { target_user_id: memberId });
+
+            if (error) throw error;
+
+            showNotification('Usuario eliminado correctamente', 'success');
+            // Optimistic update
+            setTeamMembers(prev => prev.filter(m => m.id !== memberId));
+        } catch (err) {
+            console.error('Error deleting member:', err);
+            showNotification(err.message || 'Error al eliminar usuario', 'error');
+        }
+    };
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -1016,31 +1075,60 @@ export default function SettingsPage() {
         setInviteStatus('loading');
 
         try {
-            // 1. Validate
-            if (!inviteEmail) throw new Error("Email requerido");
+            // 1. Generate unique invitation token
+            // Polyfill for crypto.randomUUID() in non-secure contexts (local network HTTP)
+            let inviteToken;
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                inviteToken = crypto.randomUUID();
+            } else {
+                // Simple fallback for local dev
+                inviteToken = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                    var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            }
 
-            // 2. Insert into organization_invites
+            // 2. Insert generic invitation (no email required)
             const { error: inviteError } = await supabase
                 .from('organization_invites')
                 .insert([{
-                    email: inviteEmail,
                     organization_id: organizationId,
-                    role: inviteRole || 'EMPLOYEE'
+                    role: inviteRole || 'EMPLOYEE',
+                    token: inviteToken,
+                    status: 'pending',
+                    email: null // Generic link - no specific email
                 }]);
 
-            if (inviteError) throw inviteError;
+            if (inviteError) {
+                console.error("Error creating invite:", inviteError);
+                throw new Error("Error al generar el link de invitación");
+            }
 
-            showNotification(`Invitación enviada a ${inviteEmail}`, 'success');
-            setInviteEmail('');
+            // 3. Generate invitation link
+            const inviteLink = `${window.location.origin}/registro-empleado?token=${inviteToken}`;
+
+            // 4. Copy to clipboard
+            try {
+                await navigator.clipboard.writeText(inviteLink);
+                showNotification(`Link copiado al portapapeles`, 'success');
+            } catch (clipErr) {
+                console.warn("Could not copy to clipboard:", clipErr);
+            }
+
+            // 5. Show modal with link and copy button
+            setGeneratedInviteLink(inviteLink);
+            setShowInviteLinkModal(true);
+
             setInviteStatus('success');
             setTimeout(() => setInviteStatus('idle'), 3000);
 
         } catch (err) {
             console.error(err);
-            showNotification(err.message || "Error enviando invitación", 'error');
+            showNotification(err.message || "Error generando link de invitación", 'error');
             setInviteStatus('error');
         }
     };
+
 
     const handleConfirmTrial = async () => {
         if (!organizationId) return;
@@ -1744,76 +1832,167 @@ export default function SettingsPage() {
 
             {
                 currentView === 'users' && (
-                    <div className="order-summary-card">
-                        {/* ... (Sección de usuarios sin cambios) ... */}
-                        {/* Mantuve el código de usuarios original pero lo he resumido aquí para que quepa */}
-                        <div style={{ padding: '1.5rem', textAlign: 'center' }}>
-                            <div style={{ marginBottom: '2rem' }}>
+                    <div className="order-summary-card" style={{ maxWidth: '1000px', margin: '0 auto', padding: '0' }}>
+                        <div style={{ padding: isMobile ? '1.5rem' : '2.5rem' }}>
+                            <div style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
                                 <div style={{ width: '64px', height: '64px', background: 'var(--bg-card-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
                                     <Users size={32} color="var(--text-primary)" />
                                 </div>
-                                <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Gestión de Usuarios</h2>
+                                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>Gestión de Equipo</h2>
                                 <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                                    <strong>Organización:</strong> <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{organizationName || 'Cargando...'}</span>
+                                    Organización: <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{organizationName || 'Cargando...'}</span>
                                 </p>
                             </div>
-                            {/* Invite Logic */}
-                            {(role === 'OWNER' || role === 'master' || !role) && (
-                                <div style={{ background: 'var(--bg-card-hover)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', textAlign: 'left', opacity: isLicenseActive ? 1 : 0.7, border: isLicenseActive ? 'none' : '1px dashed #ef4444' }}>
-                                    <h3 style={{ fontSize: '1rem', marginBottom: isLicenseActive ? '1rem' : '0.5rem', fontWeight: 600 }}>Invitar Nuevo Usuario</h3>
+
+                            {/* 1. SECCIÓN MIS DATOS */}
+                            <div style={{ marginBottom: '2.5rem' }}>
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ width: '4px', height: '20px', background: '#3b82f6', borderRadius: '4px' }}></div>
+                                    Mis Datos
+                                </h3>
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', gap: '1.5rem',
+                                    background: 'var(--bg-card-hover)', padding: '1.5rem', borderRadius: '20px',
+                                    border: '1px solid var(--accent-light)',
+                                    flexWrap: 'wrap'
+                                }}>
+                                    <div style={{
+                                        width: '60px', height: '60px', borderRadius: '50%',
+                                        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        color: 'white', fontWeight: 700, fontSize: '1.5rem'
+                                    }}>
+                                        {user?.email?.[0].toUpperCase()}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                                            {user?.user_metadata?.full_name || 'Tú'}
+                                        </div>
+                                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <Mail size={16} /> {user?.email}
+                                        </div>
+                                    </div>
+                                    <div style={{
+                                        padding: '6px 16px', borderRadius: '12px',
+                                        background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6',
+                                        fontWeight: 700, fontSize: '0.9rem', border: '1px solid rgba(59, 130, 246, 0.2)'
+                                    }}>
+                                        {roleTranslations[role] || role}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 2. TABLA DE MIEMBROS */}
+                            <div style={{ marginBottom: '3rem' }}>
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ width: '4px', height: '20px', background: '#10b981', borderRadius: '4px' }}></div>
+                                    Miembros del Equipo
+                                </h3>
+
+                                {loadingMembers ? (
+                                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Cargando equipo...</div>
+                                ) : teamMembers.length === 0 ? (
+                                    <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg-card-hover)', borderRadius: '16px', color: 'var(--text-muted)' }}>
+                                        No hay otros miembros en tu equipo aún.
+                                    </div>
+                                ) : (
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                                            <thead>
+                                                <tr style={{ borderBottom: '2px solid var(--accent-light)' }}>
+                                                    <th style={{ textAlign: 'left', padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>USUARIO</th>
+                                                    <th style={{ textAlign: 'left', padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>ROL</th>
+                                                    <th style={{ textAlign: 'left', padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>FECHA INGRESO</th>
+                                                    <th style={{ textAlign: 'right', padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>ACCIONES</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {teamMembers.map(member => (
+                                                    <tr key={member.id} style={{ borderBottom: '1px solid var(--accent-light)' }}>
+                                                        <td style={{ padding: '1rem' }}>
+                                                            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{member.full_name || 'Sin Nombre'}</div>
+                                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{member.email}</div>
+                                                        </td>
+                                                        <td style={{ padding: '1rem' }}>
+                                                            <span style={{
+                                                                padding: '4px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700,
+                                                                background: member.role === 'MANAGER' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                                                                color: member.role === 'MANAGER' ? '#f59e0b' : '#10b981'
+                                                            }}>
+                                                                {roleTranslations[member.role] || member.role}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ padding: '1rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                                            {new Date(member.created_at).toLocaleDateString()}
+                                                        </td>
+                                                        <td style={{ padding: '1rem', textAlign: 'right' }}>
+                                                            {(role === 'OWNER' || role === 'master' || role === 'MANAGER') && (
+                                                                <button
+                                                                    onClick={() => handleDeleteMember(member.id)}
+                                                                    title="Eliminar usuario"
+                                                                    style={{
+                                                                        background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none',
+                                                                        width: '36px', height: '36px', borderRadius: '10px', cursor: 'pointer',
+                                                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
+                                                                    }}
+                                                                >
+                                                                    <Trash2 size={18} />
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 3. SECCIÓN INVITAR (Mantenida) */}
+                            {(role === 'OWNER' || role === 'master' || role === 'MANAGER' || !role) && (
+                                <div style={{ background: 'var(--bg-card-hover)', borderRadius: '24px', padding: '2rem', border: '1px solid var(--accent-light)' }}>
+                                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1.5rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <div style={{ width: '4px', height: '20px', background: 'var(--text-primary)', borderRadius: '4px' }}></div>
+                                        Invitar Nuevo Usuario
+                                    </h3>
+
                                     {!isLicenseActive && (
-                                        <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, marginBottom: '1.5rem', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                                            Requiere Suscripción Activa
+                                        <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '12px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 600, marginBottom: '1.5rem', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <AlertCircle size={18} />
+                                            Requiere Suscripción Activa para invitar
                                         </div>
                                     )}
-                                    <form onSubmit={handleInvite} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', pointerEvents: isLicenseActive ? 'auto' : 'none' }}>
+
+                                    <form onSubmit={handleInvite} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', pointerEvents: isLicenseActive ? 'auto' : 'none', opacity: isLicenseActive ? 1 : 0.6 }}>
                                         <div>
-                                            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Email</label>
-                                            <input
-                                                type="email"
-                                                placeholder="usuario@email.com"
-                                                value={inviteEmail}
-                                                onChange={(e) => setInviteEmail(e.target.value)}
-                                                required
-                                                className="ticket-input-large"
-                                                style={{
-                                                    background: 'var(--bg-app)',
-                                                    color: 'var(--text-primary)',
-                                                    border: '1px solid var(--accent-light)'
-                                                }}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Rol</label>
-                                            <select
-                                                value={inviteRole}
-                                                onChange={(e) => setInviteRole(e.target.value)}
-                                                className="ticket-input-large"
-                                                style={{
-                                                    width: '100%',
-                                                    background: 'var(--bg-app)',
-                                                    color: 'var(--text-primary)',
-                                                    border: '1px solid var(--accent-light)'
-                                                }}
-                                            >
-                                                <option value="EMPLOYEE">Empleado</option>
-                                                <option value="OWNER">Administrador</option>
-                                            </select>
+                                            <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', display: 'block' }}>Rol a asignar</label>
+                                            <div style={{ position: 'relative' }}>
+                                                <select
+                                                    value={inviteRole}
+                                                    onChange={(e) => setInviteRole(e.target.value)}
+                                                    className="ticket-input-large"
+                                                    style={{ width: '100%', appearance: 'none' }}
+                                                >
+                                                    <option value="EMPLOYEE">Empleado (Ventas)</option>
+                                                    <option value="MANAGER">Administrador (Gestión Total)</option>
+                                                </select>
+                                                <ChevronDown size={20} color="var(--text-secondary)" style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                                            </div>
                                         </div>
                                         <button
                                             type="submit"
                                             disabled={inviteStatus === 'loading'}
-                                            style={{
-                                                background: 'var(--text-primary)',
-                                                color: 'var(--bg-card)',
-                                                border: 'none',
-                                                borderRadius: '12px',
-                                                padding: '1rem',
-                                                fontWeight: 600,
-                                                cursor: 'pointer'
-                                            }}
+                                            className="btn-primary-gradient"
+                                            style={{ padding: '1rem', borderRadius: '16px', fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                                         >
-                                            {inviteStatus === 'loading' ? '...' : 'Invitar'}
+                                            {inviteStatus === 'loading' ? (
+                                                <>Generating...</>
+                                            ) : (
+                                                <>
+                                                    <Link size={20} />
+                                                    Generar Link de Invitación
+                                                </>
+                                            )}
                                         </button>
                                     </form>
                                 </div>
@@ -2532,6 +2711,113 @@ export default function SettingsPage() {
                     </>
                 )
             }
+            {showInviteLinkModal && (
+                <div
+                    onClick={() => setShowInviteLinkModal(false)}
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 100000,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)'
+                    }}
+                >
+                    <div
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            backgroundColor: 'var(--bg-card)',
+                            color: 'var(--text-primary)',
+                            padding: '2.5rem',
+                            borderRadius: '24px',
+                            boxShadow: 'var(--shadow-lg)',
+                            width: '90%',
+                            maxWidth: '480px',
+                            border: '1px solid var(--accent-light)',
+                            textAlign: 'center'
+                        }}
+                    >
+                        <div style={{
+                            width: '64px', height: '64px',
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            margin: '0 auto 1.5rem auto'
+                        }}>
+                            <CheckCircle2 size={32} color="#10b981" />
+                        </div>
+
+                        <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.5rem', fontWeight: 700 }}>
+                            Link de Invitación Generado
+                        </h3>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
+                            Comparte este link con la persona que quieres invitar como <strong>{inviteRole === 'MANAGER' ? 'Administrador' : 'Empleado'}</strong>
+                        </p>
+
+                        <div style={{
+                            background: 'var(--bg-input)',
+                            padding: '1rem',
+                            borderRadius: '16px',
+                            marginBottom: '1.5rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            border: '1px solid var(--accent-light)'
+                        }}>
+                            <Link size={18} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
+                            <div style={{
+                                wordBreak: 'break-all',
+                                fontFamily: 'monospace',
+                                fontSize: '0.9rem',
+                                color: 'var(--text-primary)',
+                                textAlign: 'left',
+                                flex: 1
+                            }}>
+                                {generatedInviteLink}
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await navigator.clipboard.writeText(generatedInviteLink);
+                                        showNotification('Link copiado al portapapeles', 'success');
+                                    } catch (err) {
+                                        showNotification('Error al copiar el link', 'error');
+                                    }
+                                }}
+                                className="btn-primary-gradient"
+                                style={{
+                                    flex: 1,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                    borderRadius: '14px',
+                                    padding: '0.8rem',
+                                    fontSize: '0.95rem',
+                                    border: 'none',
+                                    color: 'white'
+                                }}
+                            >
+                                <Copy size={18} />
+                                <span>Copiar Link</span>
+                            </button>
+                            <button
+                                onClick={() => setShowInviteLinkModal(false)}
+                                style={{
+                                    flex: 1,
+                                    background: 'var(--bg-card-hover)',
+                                    color: 'var(--text-primary)',
+                                    padding: '0.8rem',
+                                    borderRadius: '14px',
+                                    border: '1px solid var(--accent-light)',
+                                    fontWeight: 600,
+                                    fontSize: '0.95rem',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

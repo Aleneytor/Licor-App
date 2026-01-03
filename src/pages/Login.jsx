@@ -27,7 +27,13 @@ export default function Login() {
             navigate(redirectPath || '/vender');
         } catch (err) {
             console.error(err);
-            setError('Credenciales inválidas o error de conexión.');
+            if (err.message === 'Email not confirmed') {
+                setError('⚠️ Debes confirmar tu correo electrónico antes de entrar. Revisa tu bandeja de entrada o contacta al administrador.');
+            } else if (err.message === 'Invalid login credentials') {
+                setError('Correo o contraseña incorrectos.');
+            } else {
+                setError(err.message || 'Error de conexión.');
+            }
         } finally {
             setLoading(false);
         }
