@@ -3,11 +3,13 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingBag, Receipt, ClipboardList, Settings, Shield, Zap, LayoutDashboard, BarChart3, Package, Users2, BadgeDollarSign, RefreshCw } from 'lucide-react';
 import InventoryFab from '../components/InventoryFab';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 import { supabase } from '../supabaseClient';
 import './MainLayout.css';
 
 export default function MainLayout() {
     const { role, isLicenseActive, organizationId, refreshLicense } = useAuth();
+    const { showNotification } = useNotification();
     const location = useLocation();
     const isAjustes = location.pathname === '/ajustes';
     const isDeveloper = location.pathname === '/developer';
@@ -16,20 +18,39 @@ export default function MainLayout() {
     const [isActivating, setIsActivating] = React.useState(false);
 
     const handleConfirmTrial = async () => {
-        if (!organizationId) return;
+        if (!organizationId) {
+            showNotification('No se encontró el ID de la organización. Por favor, cierra sesión e inicia de nuevo.', 'error');
+            return;
+        }
+
         setIsActivating(true);
+        console.log('MainLayout: Activating trial for org', organizationId);
+
         try {
             const { error } = await supabase
                 .from('organizations')
-                .update({ trial_started_at: new Date().toISOString() })
+                .update({
+                    trial_started_at: new Date().toISOString(),
+                    is_active: false, // Aseguramos que is_active sea false para que el contexto lo trate como trial
+                    plan_type: 'free' // Seteamos un plan por defecto
+                })
                 .eq('id', organizationId);
 
-            if (error) throw error;
+            if (error) {
+                console.error('MainLayout: Supabase error activating trial:', error);
+                throw error;
+            }
 
+            console.log('MainLayout: Trial activated successfully. Refreshing license...');
             await refreshLicense();
+            showNotification('¡Prueba gratis de 7 días activada con éxito!', 'success');
             setShowTrialModal(false);
+
+            // Redirigir a vender para que vea que ya tiene acceso
+            navigate('/vender');
         } catch (err) {
             console.error('Error activating trial:', err);
+            showNotification('Error al activar la prueba: ' + (err.message || 'Error desconocido'), 'error');
         } finally {
             setIsActivating(false);
         }

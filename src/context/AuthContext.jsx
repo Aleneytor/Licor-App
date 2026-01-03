@@ -13,25 +13,37 @@ export function AuthProvider({ children }) {
     const [licenseExpiresAt, setLicenseExpiresAt] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    // Prevent concurrent fetches
+    const profileLoadingRef = React.useRef(false);
+
     // Initial Session Check
     useEffect(() => {
         let isMounted = true;
 
-        // Check active session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (isMounted && session) {
-                fetchProfile(session.user);
-            } else if (isMounted) {
-                setLoading(false);
-            }
-        });
+        const checkSession = async () => {
+            console.log('Auth: Checking session...');
+            const { data: { session } } = await supabase.auth.getSession();
 
-        // Listen for changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (!isMounted) return;
 
             if (session) {
-                fetchProfile(session.user);
+                console.log('Auth: Session found for', session.user.email);
+                await fetchProfile(session.user);
+            } else {
+                console.log('Auth: No active session');
+                setLoading(false);
+            }
+        };
+
+        checkSession();
+
+        // Listen for changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (!isMounted) return;
+            console.log('Auth: onAuthStateChange event:', event);
+
+            if (session) {
+                await fetchProfile(session.user);
             } else {
                 setUser(null);
                 setRole(null);
@@ -44,11 +56,19 @@ export function AuthProvider({ children }) {
 
         return () => {
             isMounted = false;
-            subscription.unsubscribe();
+            if (subscription) subscription.unsubscribe();
         };
     }, []);
 
     const fetchProfile = async (currentUser) => {
+        if (!currentUser || profileLoadingRef.current) return;
+        profileLoadingRef.current = true;
+
+        console.log('Auth: Fetching profile for', currentUser.id);
+
+        // Seteamos el usuario inmediatamente para que las rutas privadas no nos echen
+        setUser(currentUser);
+
         try {
             // UNA SOLA query con JOIN para traer perfil + organización
             const { data: profile, error: profileError } = await supabase
@@ -67,14 +87,15 @@ export function AuthProvider({ children }) {
                 .single();
 
             if (profileError) {
-                console.error('Error fetching profile:', profileError);
-                setLoading(false);
+                console.error('Auth: Error fetching profile:', profileError);
+                // Si el error es PGRST116 (no row found), significa que el trigger falló
+                // o el perfil fue borrado. El usuario ya está seteado arriba, así que 
+                // podrá entrar pero tendrá rol null.
                 return;
             }
 
-            setUser(currentUser);
-
             if (profile) {
+                console.log('Auth: Profile loaded, role:', profile.role);
                 setRole(profile.role);
                 setOrganizationId(profile.organization_id);
 
@@ -104,36 +125,54 @@ export function AuthProvider({ children }) {
                     setIsLicenseActive(isDev);
                 }
             } else {
-                console.warn('No profile found for user');
+                console.warn('Auth: No profile found for user');
             }
         } catch (err) {
-            console.error('Error in fetchProfile:', err);
+            console.error('Auth: Error in fetchProfile:', err);
         } finally {
+            console.log('Auth: Setting loading to false');
             setLoading(false);
+            profileLoadingRef.current = false;
         }
     };
 
     const login = async (email, password) => {
         setLoading(true);
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+        console.log('Auth: login attempt for', email);
 
-        if (error) {
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) {
+                setLoading(false);
+                throw error;
+            }
+
+            // Safety timeout: if onAuthStateChange doesn't trigger fetchProfile soon,
+            // we at least stop the loading screen.
+            setTimeout(() => {
+                setLoading(false);
+            }, 5000);
+
+            return data;
+        } catch (err) {
             setLoading(false);
-            throw error;
+            throw err;
         }
-        return data;
     };
 
     const logout = async () => {
+        console.log('Auth: Logging out');
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
         // State updates handled by onAuthStateChange
     };
 
     const resetPassword = async (email) => {
+        console.log('Auth: Reset password for', email);
         // Enviar el correo de recuperación a través de Supabase
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: `${window.location.origin}/reset-password`,

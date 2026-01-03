@@ -821,14 +821,13 @@ export default function SettingsPage() {
     const { theme, toggleTheme } = useTheme();
     const { showNotification } = useNotification();
     const location = useLocation();
-
+    const navigate = useNavigate();
     const roleTranslations = {
         'OWNER': 'Administrador',
         'EMPLOYEE': 'Empleado',
         'MANAGER': 'Gerente'
     };
 
-    // Local State
     const [inviteRole, setInviteRole] = useState('EMPLOYEE');
     const [generatedInviteLink, setGeneratedInviteLink] = useState('');
     const [showInviteLinkModal, setShowInviteLinkModal] = useState(false);
@@ -1130,23 +1129,55 @@ export default function SettingsPage() {
     };
 
 
-    const handleConfirmTrial = async () => {
-        if (!organizationId) return;
+    const handleActivateTrial = async () => {
+        if (!organizationId) {
+            showNotification('No se encontró el ID de la organización. Por favor, recarga la página.', 'error');
+            return;
+        }
+
         setIsActivating(true);
+        console.log('SettingsPage: Activating trial for org', organizationId);
+
         try {
             const { error } = await supabase
                 .from('organizations')
-                .update({ trial_started_at: new Date().toISOString() })
+                .update({
+                    trial_started_at: new Date().toISOString(),
+                    is_active: false,
+                    plan_type: 'free'
+                })
                 .eq('id', organizationId);
 
-            if (error) throw error;
+            if (error) {
+                console.error('SettingsPage: Supabase error activating trial:', error);
+                throw error;
+            }
 
-            await refreshLicense();
+            console.log('SettingsPage: Trial activated successfully. Refreshing license...');
+            await refreshLicense(true);
             setShowTrialModal(false);
             showNotification('¡Prueba gratis activada por 7 días!', 'success');
+
+            // Forzar actualización de licenseInfo local
+            const { data } = await supabase
+                .from('organizations')
+                .select('license_key, is_active, plan_type, license_expires_at, trial_started_at')
+                .eq('id', organizationId)
+                .single();
+
+            if (data) {
+                const trialStart = new Date(data.trial_started_at);
+                const trialEnd = new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+                const now = new Date();
+                const daysLeft = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24));
+                setLicenseInfo({
+                    ...data,
+                    trialInfo: { isActive: true, daysLeft, expiresAt: trialEnd, startedAt: trialStart }
+                });
+            }
         } catch (err) {
             console.error('Error activating trial:', err);
-            showNotification('Error al activar la prueba', 'error');
+            showNotification('Error al activar la prueba: ' + (err.message || 'Error desconocido'), 'error');
         } finally {
             setIsActivating(false);
         }
@@ -1477,7 +1508,15 @@ export default function SettingsPage() {
 
             {/* License Status Banner - Solo en vista principal si no hay licencia activa */}
             {currentView === 'main' && !isLicenseActive && (
-                <LicenseStatusBanner onTrialClick={() => setShowTrialModal(true)} />
+                <div
+                    onClick={() => {
+                        console.log('Banner click triggered');
+                        setShowTrialModal(true);
+                    }}
+                    style={{ cursor: 'pointer', width: '100%', pointerEvents: 'auto', position: 'relative', zIndex: 10 }}
+                >
+                    <LicenseStatusBanner onTrialClick={() => setShowTrialModal(true)} />
+                </div>
             )}
 
             {currentView === 'main' && <MainMenu />}
@@ -2567,127 +2606,126 @@ export default function SettingsPage() {
             }
 
             {/* Modal de prueba gratuita */}
-            {
-                showTrialModal && (
-                    <>
+            {showTrialModal && (
+                <>
+                    <div
+                        onClick={() => setShowTrialModal(false)}
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            background: 'rgba(0, 0, 0, 0.7)',
+                            backdropFilter: 'blur(8px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 100000,
+                            padding: '1rem',
+                            animation: 'fadeIn 0.2s ease'
+                        }}
+                    >
                         <div
-                            onClick={() => setShowTrialModal(false)}
+                            onClick={(e) => e.stopPropagation()}
                             style={{
-                                position: 'fixed',
-                                inset: 0,
-                                background: 'rgba(0, 0, 0, 0.7)',
-                                backdropFilter: 'blur(8px)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                zIndex: 100000,
-                                padding: '1rem',
-                                animation: 'fadeIn 0.2s ease'
+                                background: 'var(--bg-card)',
+                                borderRadius: '24px',
+                                maxWidth: '500px',
+                                width: '100%',
+                                overflow: 'hidden',
+                                boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+                                animation: 'bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+                                border: '1px solid rgba(255, 140, 0, 0.2)'
                             }}
                         >
-                            <div
-                                onClick={(e) => e.stopPropagation()}
-                                style={{
-                                    background: 'var(--bg-card)',
-                                    borderRadius: '24px',
-                                    maxWidth: '500px',
-                                    width: '100%',
-                                    overflow: 'hidden',
-                                    boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-                                    animation: 'bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-                                    border: '1px solid rgba(255, 140, 0, 0.2)'
-                                }}
-                            >
-                                {/* Header con gradiente y rayito */}
+                            {/* Header con gradiente y rayito */}
+                            <div style={{
+                                background: 'linear-gradient(135deg, #FF8C00 0%, #FF7900 100%)',
+                                padding: '1.5rem',
+                                position: 'relative',
+                                overflow: 'hidden'
+                            }}>
                                 <div style={{
-                                    background: 'linear-gradient(135deg, #FF8C00 0%, #FF7900 100%)',
-                                    padding: '1.5rem',
-                                    position: 'relative',
-                                    overflow: 'hidden'
-                                }}>
+                                    position: 'absolute',
+                                    inset: 0,
+                                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+                                    backgroundSize: '200% 100%',
+                                    animation: 'shimmer 2s infinite'
+                                }} />
+
+                                <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                                     <div style={{
-                                        position: 'absolute',
-                                        inset: 0,
-                                        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
-                                        backgroundSize: '200% 100%',
-                                        animation: 'shimmer 2s infinite'
-                                    }} />
-
-                                    <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                                        <div style={{
-                                            background: 'rgba(255, 121, 0, 0.2)',
-                                            width: '60px',
-                                            height: '60px',
-                                            borderRadius: '50%',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            border: '2px solid rgba(255,255,255,0.4)',
-                                            animation: 'pulse 2s infinite'
-                                        }}>
-                                            <Zap size={32} color="white" fill="white" />
-                                        </div>
-                                        <h3 style={{ margin: 0, color: 'white', fontSize: '1.75rem', fontWeight: 900, textAlign: 'center' }}>Prueba Gratuita</h3>
-                                    </div>
-                                </div>
-
-                                <div style={{ padding: '2rem' }}>
-                                    <p style={{ margin: '0 0 1.5rem 0', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '1.1rem', fontWeight: 500 }}>
-                                        ¡Desbloquea 7 días de acceso total y lleva tu negocio al siguiente nivel!
-                                    </p>
-
-                                    <div className="benefits-modal-grid-settings" style={{
-                                        display: 'grid',
-                                        gap: '1rem',
-                                        marginBottom: '2rem'
+                                        background: 'rgba(255, 121, 0, 0.2)',
+                                        width: '60px',
+                                        height: '60px',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        border: '2px solid rgba(255,255,255,0.4)',
+                                        animation: 'pulse 2s infinite'
                                     }}>
-                                        <div style={{ background: 'var(--bg-card-hover)', padding: '1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <CheckCircle2 color="#10b981" size={20} />
-                                            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Cuentas Ilimitadas</span>
-                                        </div>
-                                        <div style={{ background: 'var(--bg-card-hover)', padding: '1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <CheckCircle2 color="#10b981" size={20} />
-                                            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Multi-usuario</span>
-                                        </div>
-                                        <div style={{ background: 'var(--bg-card-hover)', padding: '1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <CheckCircle2 color="#10b981" size={20} />
-                                            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Soporte Realtime</span>
-                                        </div>
-                                        <div style={{ background: 'var(--bg-card-hover)', padding: '1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <CheckCircle2 color="#10b981" size={20} />
-                                            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Estadísticas VIP</span>
-                                        </div>
+                                        <Zap size={32} color="white" fill="white" />
                                     </div>
-
-                                    <button
-                                        onClick={handleActivateTrial}
-                                        disabled={isActivating}
-                                        style={{
-                                            width: '100%',
-                                            padding: '1.25rem',
-                                            borderRadius: '16px',
-                                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                            color: 'white',
-                                            border: 'none',
-                                            fontSize: '1.1rem',
-                                            fontWeight: 800,
-                                            cursor: isActivating ? 'not-allowed' : 'pointer',
-                                            boxShadow: '0 10px 20px rgba(16, 185, 129, 0.2)',
-                                            transition: 'all 0.2s ease',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '8px'
-                                        }}
-                                    >
-                                        <Zap size={20} fill="white" />
-                                        {isActivating ? 'Configurando...' : 'Activar Prueba'}
-                                    </button>
+                                    <h3 style={{ margin: 0, color: 'white', fontSize: '1.75rem', fontWeight: 900, textAlign: 'center' }}>Prueba Gratuita</h3>
                                 </div>
                             </div>
-                        </div>
 
-                        <style>{`
+                            <div style={{ padding: '2rem' }}>
+                                <p style={{ margin: '0 0 1.5rem 0', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '1.1rem', fontWeight: 500 }}>
+                                    ¡Desbloquea 7 días de acceso total y lleva tu negocio al siguiente nivel!
+                                </p>
+
+                                <div className="benefits-modal-grid-settings" style={{
+                                    display: 'grid',
+                                    gap: '1rem',
+                                    marginBottom: '2rem'
+                                }}>
+                                    <div style={{ background: 'var(--bg-card-hover)', padding: '1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <CheckCircle2 color="#10b981" size={20} />
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Cuentas Ilimitadas</span>
+                                    </div>
+                                    <div style={{ background: 'var(--bg-card-hover)', padding: '1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <CheckCircle2 color="#10b981" size={20} />
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Multi-usuario</span>
+                                    </div>
+                                    <div style={{ background: 'var(--bg-card-hover)', padding: '1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <CheckCircle2 color="#10b981" size={20} />
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Soporte Realtime</span>
+                                    </div>
+                                    <div style={{ background: 'var(--bg-card-hover)', padding: '1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <CheckCircle2 color="#10b981" size={20} />
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Estadísticas VIP</span>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleActivateTrial}
+                                    disabled={isActivating}
+                                    style={{
+                                        width: '100%',
+                                        padding: '1.25rem',
+                                        borderRadius: '16px',
+                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                        color: 'white',
+                                        border: 'none',
+                                        fontSize: '1.1rem',
+                                        fontWeight: 800,
+                                        cursor: isActivating ? 'not-allowed' : 'pointer',
+                                        boxShadow: '0 10px 20px rgba(16, 185, 129, 0.2)',
+                                        transition: 'all 0.2s ease',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px'
+                                    }}
+                                >
+                                    <Zap size={20} fill="white" />
+                                    {isActivating ? 'Configurando...' : 'Activar Prueba'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <style>{`
                             .benefits-modal-grid-settings { grid-template-columns: repeat(2, 1fr); }
                             @media (max-width: 640px) {
                                 .benefits-modal-grid-settings { grid-template-columns: 1fr; }
@@ -2708,8 +2746,8 @@ export default function SettingsPage() {
                                 50% { transform: scale(1.05); }
                             }
                         `}</style>
-                    </>
-                )
+                </>
+            )
             }
             {showInviteLinkModal && (
                 <div

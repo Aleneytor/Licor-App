@@ -463,27 +463,47 @@ export default function FreeTrialReminder() {
                                 <button
                                     onClick={async () => {
                                         try {
-                                            const { data: { user } } = await supabase.auth.getUser();
-                                            if (!user) return;
-
-                                            const { data: profile } = await supabase
-                                                .from('profiles')
-                                                .select('organization_id')
-                                                .eq('id', user.id)
-                                                .single();
-
-                                            if (profile?.organization_id) {
+                                            if (!organizationId) {
+                                                const { data: { user } } = await supabase.auth.getUser();
+                                                if (!user) return;
+                                                const { data: profile } = await supabase
+                                                    .from('profiles')
+                                                    .select('organization_id')
+                                                    .eq('id', user.id)
+                                                    .single();
+                                                if (!profile?.organization_id) {
+                                                    alert('No se pudo encontrar tu organización. Por favor contacta a soporte.');
+                                                    return;
+                                                }
+                                                // Usar el ID encontrado
                                                 const { error } = await supabase
                                                     .from('organizations')
-                                                    .update({ trial_started_at: new Date().toISOString() })
+                                                    .update({
+                                                        trial_started_at: new Date().toISOString(),
+                                                        is_active: false,
+                                                        plan_type: 'free'
+                                                    })
                                                     .eq('id', profile.organization_id);
 
-                                                if (!error) {
-                                                    window.location.reload();
-                                                }
+                                                if (error) throw error;
+                                            } else {
+                                                const { error } = await supabase
+                                                    .from('organizations')
+                                                    .update({
+                                                        trial_started_at: new Date().toISOString(),
+                                                        is_active: false,
+                                                        plan_type: 'free'
+                                                    })
+                                                    .eq('id', organizationId);
+
+                                                if (error) throw error;
                                             }
+
+                                            // En lugar de reload, usamos el contexto si es posible
+                                            window.location.reload();
                                         } catch (err) {
                                             console.error('Error activating trial:', err);
+                                            alert('Error al activar: ' + (err.message || 'Error desconocido'));
                                         }
                                     }}
                                     style={{
